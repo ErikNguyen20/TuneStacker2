@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="24dp"
+    android:gravity="center_vertical"
+    android:background="@drawable/dialog_background"
+    android:elevation="6dp"
+    >
+
+    <ProgressBar
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:indeterminate="true"
+        android:indeterminateTint="@color/primary_theme"
+        android:indeterminateTintMode="src_in"
+        />
+
+    <TextView
+        android:id="@+id/updatingText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="Attempting to update Yt-Dlp..."
+        android:textColor="@color/white"
+        android:textSize="18sp"
+        />
+</LinearLayout>

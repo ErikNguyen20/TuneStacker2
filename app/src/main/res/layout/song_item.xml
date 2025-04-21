@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="8dp"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <androidx.appcompat.widget.AppCompatCheckBox
+        android:id="@+id/songCheckBox"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:visibility="gone"
+        android:layout_marginEnd="24dp"
+        android:layout_gravity="center_vertical"
+        android:background="@drawable/circular_checkbox_selector"
+        android:button="@null"
+        android:focusable="false"
+        android:clickable="false"
+        />
+
+    <!-- Thumbnail -->
+
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/songThumbnail"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:scaleType="centerCrop"
+        android:layout_marginEnd="12dp"
+        app:shapeAppearanceOverlay="@style/RoundedThumbnailShape"/>
+
+    <!-- Song Title -->
+    <TextView
+        android:id="@+id/songTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Song Name"
+        android:textColor="@android:color/white"
+        android:textSize="16sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <!-- Three-dot menu -->
+    <ImageButton
+        android:id="@+id/optionsButton"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_marginStart="12dp"
+        android:src="@drawable/baseline_more_vert_24"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Options"
+        app:tint="@color/light_gray" />
+</LinearLayout>
