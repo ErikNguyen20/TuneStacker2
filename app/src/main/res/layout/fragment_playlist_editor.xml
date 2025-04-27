@@ -204,6 +204,7 @@
                 app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.Circle"
                 android:src="@drawable/vertical_align_top_24px"
                 app:useCompatPadding="true"
+                app:tint="@android:color/white"
                 />
 
         </FrameLayout>
