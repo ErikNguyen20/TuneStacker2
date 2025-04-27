@@ -4,6 +4,8 @@ package com.example.tunestacker2.Pages;
 import android.content.Context;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.DisplayMetrics;
@@ -101,6 +103,8 @@ public class PlaylistEditorFragment extends Fragment {
     // --- Communication ---
     // Listener interface for communicating events back to the hosting Activity.
     private PlaylistEditorFragmentListener listener;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private Runnable hideRunnable;
 
     // --- State ---
     private boolean isClosing = false;
@@ -232,6 +236,15 @@ public class PlaylistEditorFragment extends Fragment {
         listener = null;
     }
 
+    /**
+     * Called when the fragment is no longer visible to the user.
+     */
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        handler.removeCallbacksAndMessages(null);
+    }
+
     // --- Initialization Methods ---
 
     /**
@@ -348,8 +361,18 @@ public class PlaylistEditorFragment extends Fragment {
                     // more than 6 items scrolled down
                     if (firstVisiblePosition > 6) {
                         if(scrollToTopButton != null) scrollToTopButton.show();
+
+                        // Reset the hide timer
+                        handler.removeCallbacks(hideRunnable);
+                        hideRunnable = () -> {
+                            if (scrollToTopButton != null) scrollToTopButton.hide();
+                        };
+                        handler.postDelayed(hideRunnable, 3000);
                     } else {
                         if(scrollToTopButton != null) scrollToTopButton.hide();
+
+                        // Also cancel any pending hide if we're back at top
+                        handler.removeCallbacks(hideRunnable);
                     }
                 }
             }

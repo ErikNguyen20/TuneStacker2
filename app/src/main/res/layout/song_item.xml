@@ -51,7 +51,7 @@
         android:id="@+id/optionsButton"
         android:layout_width="32dp"
         android:layout_height="60dp"
-        android:layout_marginStart="12dp"
+        android:layout_marginStart="8dp"
         android:src="@drawable/baseline_more_vert_24"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="Options"

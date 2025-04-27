@@ -15,6 +15,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
@@ -102,6 +104,8 @@ public class LibraryFragment extends Fragment {
     // State
     private int selectedSortId = 0; // 0: Alpha, 1: Newest, 2: Oldest. Persisted via DataManager.Settings.
     private LibraryFragmentRequestsListener listener; // Listener for activity communication
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private Runnable hideRunnable;
 
     // --- Constructors and Lifecycle Methods ---
 
@@ -182,6 +186,15 @@ public class LibraryFragment extends Fragment {
         listener = null;
     }
 
+    /**
+     * Called when the fragment is no longer visible to the user.
+     */
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        handler.removeCallbacksAndMessages(null);
+    }
+
     // --- Initialization Helpers ---
 
     /**
@@ -216,11 +229,21 @@ public class LibraryFragment extends Fragment {
                 if (layoutManager != null) {
                     int firstVisiblePosition = layoutManager.findFirstVisibleItemPosition();
 
-                    // more than 5 items scrolled down
-                    if (firstVisiblePosition > 5) {
+                    // more than 6 items scrolled down
+                    if (firstVisiblePosition > 6) {
                         if(scrollToTopButton != null) scrollToTopButton.show();
+
+                        // Reset the hide timer
+                        handler.removeCallbacks(hideRunnable);
+                        hideRunnable = () -> {
+                            if (scrollToTopButton != null) scrollToTopButton.hide();
+                        };
+                        handler.postDelayed(hideRunnable, 3000);
                     } else {
                         if(scrollToTopButton != null) scrollToTopButton.hide();
+
+                        // Also cancel any pending hide if we're back at top
+                        handler.removeCallbacks(hideRunnable);
                     }
                 }
             }
