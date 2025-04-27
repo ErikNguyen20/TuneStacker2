@@ -15,6 +15,8 @@ import android.view.ViewGroup;
 import android.view.WindowMetrics;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -38,6 +40,7 @@ import com.example.tunestacker2.MusicPlayer.Playlist;
 import com.example.tunestacker2.MusicPlayer.Song;
 import com.example.tunestacker2.MusicPlayer.ThumbnailLoader;
 import com.example.tunestacker2.R;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -93,6 +96,7 @@ public class PlaylistEditorFragment extends Fragment {
     private ImageButton btnOptions;
     private ImageButton btnBack;
     private Button btnShuffle;
+    private FloatingActionButton scrollToTopButton;
 
     // --- Communication ---
     // Listener interface for communicating events back to the hosting Activity.
@@ -250,6 +254,7 @@ public class PlaylistEditorFragment extends Fragment {
         btnShuffle = view.findViewById(R.id.btnShuffle);
         btnOptions = view.findViewById(R.id.btnOptions);
         btnBack = view.findViewById(R.id.btnBack);
+        scrollToTopButton = view.findViewById(R.id.scrollToTopButton);
     }
 
     /**
@@ -302,9 +307,10 @@ public class PlaylistEditorFragment extends Fragment {
             public void onSongMoveUp(int pos) {
                 if(songList == null || songList.isEmpty() || pos <= 0 || pos >= songList.size()) return;
 
-                // Handle drag and drop
-                boolean moveSuccessful = onMoveHandler(pos, 0);
-                if(!moveSuccessful) return;
+                // Move the song to the very top
+                Song song = songList.remove(pos);
+                songList.add(0, song);
+                adapter.notifyItemMoved(pos, 0);
 
                 // Persist the changed order after the drag operation is complete
                 DataManager.getInstance().updateSongsInPlaylistAsync(playlist.getTitle(), songList, success -> {
@@ -317,9 +323,10 @@ public class PlaylistEditorFragment extends Fragment {
             public void onSongMoveDown(int pos) {
                 if(songList == null || songList.isEmpty() || pos < 0 || pos >= songList.size() - 1) return;
 
-                // Handle drag and drop
-                boolean moveSuccessful = onMoveHandler(pos, songList.size() - 1);
-                if(!moveSuccessful) return;
+                // Move the song to the very bottom
+                Song song = songList.remove(pos);
+                songList.add(song);
+                adapter.notifyItemMoved(pos, songList.size() - 1);
 
                 // Persist the changed order after the drag operation is complete
                 DataManager.getInstance().updateSongsInPlaylistAsync(playlist.getTitle(), songList, success -> {
@@ -329,6 +336,24 @@ public class PlaylistEditorFragment extends Fragment {
             }
         });
         playlistRecyclerView.setAdapter(adapter);
+
+        // Scroll listener to show/hide button
+        playlistRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+                if (layoutManager != null) {
+                    int firstVisiblePosition = layoutManager.findFirstVisibleItemPosition();
+
+                    // more than 6 items scrolled down
+                    if (firstVisiblePosition > 6) {
+                        if(scrollToTopButton != null) scrollToTopButton.show();
+                    } else {
+                        if(scrollToTopButton != null) scrollToTopButton.hide();
+                    }
+                }
+            }
+        });
 
         // Setup drag-and-drop functionality
         setupItemTouchHelper();
@@ -436,6 +461,12 @@ public class PlaylistEditorFragment extends Fragment {
             });
             popup.show();
         });
+
+        // Floating Action Button to scroll to the top of the playlistRecyclerView
+        scrollToTopButton.setOnClickListener(v -> {
+            if(playlistRecyclerView != null) playlistRecyclerView.scrollToPosition(0);
+            if(scrollToTopButton != null) scrollToTopButton.hide();
+        });
     }
 
     /**
@@ -453,22 +484,6 @@ public class PlaylistEditorFragment extends Fragment {
     }
 
     // --- Action Handlers ---
-
-    /**
-     * Handles recycler view item movement for the playlist.
-     * @param fromPos from index
-     * @param toPos to index
-     */
-    private boolean onMoveHandler(int fromPos, int toPos) {
-        // Swap the items in the local list
-        if (adapter == null || fromPos < 0 || toPos < 0 ||
-                fromPos >= songList.size() || toPos >= songList.size()) return false;
-        Collections.swap(songList, fromPos, toPos);
-        // adapter.notifyDataSetChanged();
-        adapter.notifyItemChanged(fromPos);
-        adapter.notifyItemChanged(toPos);
-        return true;
-    }
 
     /**
      * Opens a dialog prompting the user to enter a new name for the playlist.
@@ -519,6 +534,16 @@ public class PlaylistEditorFragment extends Fragment {
                     isUpdating = false;
                 }
             }
+        });
+
+        // Listener for name input
+        textInput.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                // Hide keyboard
+                hideKeyboard(textInput);
+                return true;
+            }
+            return false;
         });
 
         // Set click listener for the Confirm button
@@ -685,6 +710,20 @@ public class PlaylistEditorFragment extends Fragment {
     }
 
     // --- Utility Methods ---
+
+    /**
+     * Hides the soft keyboard associated with the given view.
+     * @param view The view that currently has focus (e.g., an EditText).
+     */
+    private void hideKeyboard(View view) {
+        if (!isAdded() || view == null) return;
+
+        InputMethodManager imm = (InputMethodManager) requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+        }
+        view.clearFocus();
+    }
 
     /**
      * Gets the screen height in pixels. Handles different Android versions.

@@ -343,7 +343,7 @@ public class MediaPlayerService extends Service {
                     // Regained focus: Resume playback if needed, restore volume
                     Log.d(TAG, "Audio Focus: AUDIOFOCUS_GAIN");
                     if (resumeOnFocusGain && mediaPlayer != null && !mediaPlayer.isPlaying()) {
-                        play();
+                        safePlay();
                         resumeOnFocusGain = false;
                     }
                     // Restore full volume
@@ -423,17 +423,25 @@ public class MediaPlayerService extends Service {
 
             // Check if audio focus was granted
             if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-                Log.d(TAG, "Audio focus granted, starting playback.");
-                mediaPlayer.start(); // Start playback
-                mediaSession.setActive(true); // Ensure session is active
-                updatePlaybackState(PlaybackStateCompat.STATE_PLAYING);
-
-                progressHandler.removeCallbacks(progressRunnable);
-                progressHandler.post(progressRunnable);
-                updateNotification();
+                safePlay();
             } else {
                 Log.w(TAG, "Audio focus not granted, cannot start playback.");
             }
+        }
+    }
+
+    /**
+     * Starts playback if the MediaPlayer is prepared and not already playing.
+     */
+    private void safePlay() {
+        if (mediaPlayer != null && isPrepared && !mediaPlayer.isPlaying()) {
+            mediaPlayer.start();
+            mediaSession.setActive(true); // Ensure session is active
+            updatePlaybackState(PlaybackStateCompat.STATE_PLAYING);
+
+            progressHandler.removeCallbacks(progressRunnable);
+            progressHandler.post(progressRunnable);
+            updateNotification();
         }
     }
 
@@ -754,7 +762,6 @@ public class MediaPlayerService extends Service {
             return;
         }
 
-        Log.d(TAG, "Updating MediaMetadata for: " + song.getTitle());
         // Start building the metadata
         MediaMetadataCompat.Builder builder = new MediaMetadataCompat.Builder()
                 .putString(MediaMetadataCompat.METADATA_KEY_TITLE, song.getTitle())

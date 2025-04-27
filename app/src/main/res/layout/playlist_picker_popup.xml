@@ -37,7 +37,7 @@
         android:overScrollMode="ifContentScrolls"
         android:clipToPadding="false"
         android:layout_marginBottom="16dp"
-        android:layout_marginHorizontal="24dp"
+        android:layout_marginHorizontal="12dp"
         />
 
     <View

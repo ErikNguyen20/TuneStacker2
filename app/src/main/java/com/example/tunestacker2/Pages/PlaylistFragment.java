@@ -173,11 +173,13 @@ public class PlaylistFragment extends Fragment {
             @Override
             public void onPlaylistClicked(int pos) {
                 // Handle playlist item clicks (If its the first one, don't bother updating)
-                if (pos > 0 && pos < playlistList.size()) {
+                if (pos >= 0 && pos < playlistList.size()) {
                     Playlist playlist = playlistList.get(pos);
                     if (listener != null) listener.onLaunchPlaylistEditor(playlist);
 
                     // Update last played time for the playlist
+                    // (If its the first one, don't bother updating)
+                    if(pos == 0) return;
                     DataManager.getInstance().updateTimePlaylistAsync(playlist.getTitle(), success -> {
                         // Do nothing here
                     });

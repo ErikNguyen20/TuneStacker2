@@ -144,6 +144,8 @@
                 app:autoSizeMinTextSize="8sp"
                 app:autoSizeMaxTextSize="14sp"
                 app:autoSizeStepGranularity="1sp"
+                android:maxLines="1"
+                android:ellipsize="none"
                 />
 
 
@@ -170,19 +172,41 @@
                 app:autoSizeMinTextSize="8sp"
                 app:autoSizeMaxTextSize="14sp"
                 app:autoSizeStepGranularity="1sp"
+                android:maxLines="1"
+                android:ellipsize="none"
                 />
         </LinearLayout>
 
-        <!-- Horizontal song list -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/playlistRecyclerView"
+
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clipToPadding="false"
-            android:paddingBottom="16dp"
-            android:overScrollMode="ifContentScrolls"
-            />
+            android:layout_height="match_parent">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/playlistRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="16dp"
+                android:overScrollMode="ifContentScrolls"
+                />
+
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/scrollToTopButton"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                app:fabCustomSize="32dp"
+                app:maxImageSize="24dp"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginBottom="12dp"
+                android:visibility="gone"
+                app:backgroundTint="@color/semitransparent_background"
+                app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.Circle"
+                android:src="@drawable/vertical_align_top_24px"
+                app:useCompatPadding="true"
+                />
+
+        </FrameLayout>
 
     </LinearLayout>
 </FrameLayout>

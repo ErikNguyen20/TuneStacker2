@@ -244,7 +244,7 @@ public class ForegroundDownloadService extends Service {
         String title = FileUtils.sanitizeFilename(streamInfo.getTitle());
         String ext = DataManager.Settings.GetFileExtension();
         if (FileUtils.findFileInDirectory(getApplicationContext(), DataManager.Settings.GetAudioDirectory(), title + "." + ext) != null) {
-            Log.e(ForegroundDownloadService.TAG, "File already exists!");
+            Log.e(ForegroundDownloadService.TAG, "This Audio File already exists!");
             throw new RuntimeException("File already exists.");
         }
 

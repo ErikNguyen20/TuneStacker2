@@ -48,7 +48,9 @@
             android:padding="10dp"
             android:textColor="#FFFFFF"
             android:textColorHint="@color/light_gray"
-            android:textSize="14sp" />
+            android:textSize="14sp"
+            android:imeOptions="actionDone"
+            />
 
     </LinearLayout>
 

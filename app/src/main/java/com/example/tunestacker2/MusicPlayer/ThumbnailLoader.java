@@ -81,9 +81,6 @@ public class ThumbnailLoader {
             }
         }
 
-        // Safe callback
-        WeakReference<ThumbnailCallback> callbackRef = new WeakReference<>(callback);
-
         executor.execute(() -> {
             Bitmap bitmap = null;
 
@@ -113,10 +110,7 @@ public class ThumbnailLoader {
             }
             Bitmap finalBitmap = bitmap;
             mainHandler.post(() -> {
-                ThumbnailCallback cb = callbackRef.get();
-                if (cb != null) {
-                    cb.onThumbnailLoaded(finalBitmap);
-                }
+                callback.onThumbnailLoaded(finalBitmap);
             });
         });
     }
@@ -156,9 +150,6 @@ public class ThumbnailLoader {
             return;
         }
 
-        // Safe callback
-        WeakReference<ThumbnailCallback> callbackRef = new WeakReference<>(callback);
-
         Uri audioUri = song.getAudioUri();
         executor.execute(() -> {
             Bitmap bitmap = null;
@@ -183,10 +174,7 @@ public class ThumbnailLoader {
             if (bitmap != null) {
                 Bitmap finalBitmap = bitmap;
                 mainHandler.post(() -> {
-                    ThumbnailCallback cb = callbackRef.get();
-                    if (cb != null) {
-                        cb.onThumbnailLoaded(finalBitmap);
-                    }
+                    callback.onThumbnailLoaded(finalBitmap);
                 });
             }
         });

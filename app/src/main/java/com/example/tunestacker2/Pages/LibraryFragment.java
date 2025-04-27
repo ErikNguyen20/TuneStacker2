@@ -705,6 +705,15 @@ public class LibraryFragment extends Fragment {
             }
         });
 
+        // Listener for URL input
+        urlInput.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                // Hide keyboard
+                hideKeyboard(urlInput);
+                return true;
+            }
+            return false;
+        });
 
         dialog.show();
     }

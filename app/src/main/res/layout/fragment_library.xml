@@ -93,7 +93,7 @@
                 app:fabCustomSize="32dp"
                 app:maxImageSize="24dp"
                 android:layout_gravity="bottom|center_horizontal"
-                android:layout_marginBottom="32dp"
+                android:layout_marginBottom="8dp"
                 android:visibility="gone"
                 app:backgroundTint="@color/semitransparent_background"
                 app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.Circle"
