@@ -14,6 +14,7 @@ import androidx.collection.LruCache;
 import com.example.tunestacker2.R;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -80,6 +81,9 @@ public class ThumbnailLoader {
             }
         }
 
+        // Safe callback
+        WeakReference<ThumbnailCallback> callbackRef = new WeakReference<>(callback);
+
         executor.execute(() -> {
             Bitmap bitmap = null;
 
@@ -108,7 +112,12 @@ public class ThumbnailLoader {
                 cache64x64.put(audioUri.toString(), bitmap);
             }
             Bitmap finalBitmap = bitmap;
-            mainHandler.post(() -> callback.onThumbnailLoaded(finalBitmap));
+            mainHandler.post(() -> {
+                ThumbnailCallback cb = callbackRef.get();
+                if (cb != null) {
+                    cb.onThumbnailLoaded(finalBitmap);
+                }
+            });
         });
     }
 
@@ -147,6 +156,9 @@ public class ThumbnailLoader {
             return;
         }
 
+        // Safe callback
+        WeakReference<ThumbnailCallback> callbackRef = new WeakReference<>(callback);
+
         Uri audioUri = song.getAudioUri();
         executor.execute(() -> {
             Bitmap bitmap = null;
@@ -170,7 +182,12 @@ public class ThumbnailLoader {
             // Only callback when the bitmap is loaded
             if (bitmap != null) {
                 Bitmap finalBitmap = bitmap;
-                mainHandler.post(() -> callback.onThumbnailLoaded(finalBitmap));
+                mainHandler.post(() -> {
+                    ThumbnailCallback cb = callbackRef.get();
+                    if (cb != null) {
+                        cb.onThumbnailLoaded(finalBitmap);
+                    }
+                });
             }
         });
     }

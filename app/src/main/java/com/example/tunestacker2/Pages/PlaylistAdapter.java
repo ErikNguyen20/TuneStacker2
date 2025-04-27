@@ -64,6 +64,10 @@ public class PlaylistAdapter extends RecyclerView.Adapter<PlaylistAdapter.Playli
                 }
             });
         }
+        else {
+            // Sets to default if no songs
+            holder.songThumbnail.setImageBitmap(ThumbnailLoader.loadThumbnailSync(null, context.getApplicationContext()));
+        }
 
         // Regular click event
         holder.itemView.setOnClickListener(v -> {

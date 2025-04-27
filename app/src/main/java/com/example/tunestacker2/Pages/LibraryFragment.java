@@ -18,8 +18,10 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
@@ -85,6 +87,7 @@ public class LibraryFragment extends Fragment {
     // UI Elements
     private SwipeRefreshLayout swipeRefreshLayout;
     private FloatingActionButton fabAddSong;
+    private FloatingActionButton scrollToTopButton;
     private RecyclerView recyclerView;
     private ImageButton filterButton;
     private EditText searchBar;
@@ -188,6 +191,7 @@ public class LibraryFragment extends Fragment {
     private void initializeViews(@NonNull View view) {
         searchBar = view.findViewById(R.id.searchBar);
         fabAddSong = view.findViewById(R.id.fabAddSong);
+        scrollToTopButton = view.findViewById(R.id.scrollToTopButton);
         filterButton = view.findViewById(R.id.filterButton);
         recyclerView = view.findViewById(R.id.songRecyclerView);
         swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout);
@@ -203,6 +207,24 @@ public class LibraryFragment extends Fragment {
         // Create and set the adapter
         songAdapter = new LibraryAdapter(requireContext(), filteredSongList, createSongAdapterListener());
         recyclerView.setAdapter(songAdapter);
+
+        // Scroll listener to show/hide button
+        recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+                if (layoutManager != null) {
+                    int firstVisiblePosition = layoutManager.findFirstVisibleItemPosition();
+
+                    // more than 5 items scrolled down
+                    if (firstVisiblePosition > 5) {
+                        if(scrollToTopButton != null) scrollToTopButton.show();
+                    } else {
+                        if(scrollToTopButton != null) scrollToTopButton.hide();
+                    }
+                }
+            }
+        });
     }
 
     /**
@@ -279,14 +301,23 @@ public class LibraryFragment extends Fragment {
         // Hide keyboard when touching outside the search bar
         root.setOnTouchListener((v, event) -> {
             if (searchBar.isFocused()) {
-                searchBar.clearFocus();
                 hideKeyboard(searchBar);
             }
-            return false;
+            if (event.getAction() == MotionEvent.ACTION_UP) {
+                v.performClick(); // simulate a click for accessibility tools
+            }
+            return false; // Still let the event pass through
         });
+
 
         // Floating Action Button to add a new song (open download dialog)
         fabAddSong.setOnClickListener(v -> OpenDownloadDialog());
+
+        // Floating Action Button to scroll to the top of the RecyclerView
+        scrollToTopButton.setOnClickListener(v -> {
+            if(recyclerView != null) recyclerView.scrollToPosition(0);
+            if(scrollToTopButton != null) scrollToTopButton.hide();
+        });
 
         // SwipeRefreshLayout to refresh the song list
         swipeRefreshLayout.setOnRefreshListener(this::refreshSongList); // Use method reference
@@ -308,6 +339,15 @@ public class LibraryFragment extends Fragment {
 
             @Override
             public void afterTextChanged(Editable s) {}
+        });
+
+        searchBar.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                // Hide keyboard
+                hideKeyboard(searchBar);
+                return true;
+            }
+            return false;
         });
     }
 
@@ -682,6 +722,7 @@ public class LibraryFragment extends Fragment {
         if (imm != null) {
             imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
         }
+        view.clearFocus();
     }
 
     // --- Data Handling (Refresh, Sort, Filter) ---

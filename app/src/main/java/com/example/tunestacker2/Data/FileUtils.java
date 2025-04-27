@@ -19,6 +19,7 @@ import com.google.gson.JsonParser;
 
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -66,6 +67,13 @@ public class FileUtils {
         }
 
         return result;
+    }
+
+    public static String removeExtensionFromName(String fileName) {
+        if (fileName != null && fileName.contains(".")) {
+            return fileName.substring(0, fileName.lastIndexOf(".")).trim();
+        }
+        return fileName;
     }
 
     /**
@@ -137,15 +145,16 @@ public class FileUtils {
      * @return A safe and sanitized file name.
      */
     public static String sanitizeFilename(String fileName) {
-        //Remotes leading and ending spaces.
+        // Remotes leading and ending spaces.
         String valid = fileName.trim();
-        //Limits character length to 250 characters.
+        // Limits character length to 250 characters.
         if(valid.length() > 250) {
             valid = valid.substring(0,250);
         }
 
-        //Remove all control characters + DELETE(U+007F)
-        valid = valid.replaceAll("[\\x{0000}-\\x{001F}\\x{007F}]","");
+        // Remove all control characters + DELETE(U+007F)
+        // valid = valid.replaceAll("[\\x{0000}-\\x{001F}\\x{007F}]","");
+        valid = valid.replaceAll("\\p{Cntrl}", "");
 
         return valid
                 .replace(".", "．")    // Full width period
@@ -280,7 +289,8 @@ public class FileUtils {
                     if (mimeType != null && mimeType.startsWith("audio/")) {
                         // Add song to list
                         Uri fileUri = DocumentsContract.buildDocumentUriUsingTree(directoryUri, docId);
-                        audioUris.add(new Song(displayName, fileUri, lastModified));
+                        String targetTitle = FileUtils.removeExtensionFromName(displayName);
+                        audioUris.add(new Song(targetTitle, fileUri, lastModified));
                     }
                 }
             }
@@ -298,6 +308,7 @@ public class FileUtils {
      * @param directoryUri The Uri of the directory containing the JSON files.
      * @return A list of playlists parsed from the JSON files.
      */
+    @Deprecated
     public static List<Playlist> playlistsFromJsonFiles(Context context, Uri directoryUri) {
         if(directoryUri == null) return new ArrayList<>();
 
@@ -360,14 +371,12 @@ public class FileUtils {
 
         ContentResolver resolver = context.getApplicationContext().getContentResolver();
 
-        try (InputStream inputStream = resolver.openInputStream(jsonUri)) {
-            // Read entire stream into a String
-            String rawJson = new BufferedReader(new InputStreamReader(inputStream))
-                    .lines()
-                    .collect(Collectors.joining());
+        try (InputStream inputStream = resolver.openInputStream(jsonUri);
+             InputStreamReader isReader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
+             BufferedReader reader = new BufferedReader(isReader)) {
 
-            // Parse from string
-            JsonElement element = JsonParser.parseString(rawJson);
+            // Parse from reader
+            JsonElement element = JsonParser.parseReader(reader);
             if (element == null || !element.isJsonObject()) {
                 Log.e(TAG, "Invalid or empty JSON content.");
                 return null;
@@ -436,7 +445,7 @@ public class FileUtils {
                         }
                         if (playlistSet.contains(targetTitle.trim())) {
                             Uri fileUri = DocumentsContract.buildDocumentUriUsingTree(directoryUri, docId);
-                            playlistMap.put(targetTitle, new Song(displayName, fileUri, lastModified));
+                            playlistMap.put(targetTitle, new Song(targetTitle, fileUri, lastModified));
                         }
                     }
                 }
@@ -496,7 +505,8 @@ public class FileUtils {
 
         // Write to the json file
         try (OutputStream out = resolver.openOutputStream(jsonUri, "wt");
-             OutputStreamWriter writer = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
+             OutputStreamWriter osWriter = new OutputStreamWriter(out, StandardCharsets.UTF_8);
+             BufferedWriter writer = new BufferedWriter(osWriter)) {
 
             // Set json fields from the playlist object
             JsonObject root = new JsonObject();
@@ -541,5 +551,142 @@ public class FileUtils {
             builder.append(line).append("\n");
         }
         return builder.toString();
+    }
+
+    /**
+     * Reads all JSON files in a directory and constructs Playlist objects from them.
+     *
+     * @param context      The context used to access the content resolver.
+     * @param directoryUri The Uri of the directory containing the JSON files.
+     * @return A list of playlists parsed from the JSON files.
+     */
+    public static List<Playlist> batchedPlaylistsFromJsonFiles(Context context, Uri directoryUri) {
+        if(directoryUri == null) return new ArrayList<>();
+
+        List<Playlist> listOfPlaylists = new ArrayList<>();
+        Map<Uri, List<String>> playlistsSongsOrdered = new HashMap<>();
+        Map<String, Song> audioUris = new HashMap<>();
+
+        Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                directoryUri,
+                DocumentsContract.getTreeDocumentId(directoryUri)
+        );
+        try (Cursor cursor = context.getApplicationContext().getContentResolver().query(childrenUri,
+                new String[]{
+                        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                        DocumentsContract.Document.COLUMN_MIME_TYPE,
+                        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                        DocumentsContract.Document.COLUMN_LAST_MODIFIED
+                },
+                null, null, null)) {
+
+            if (cursor != null) {
+                // Iterate over each document in the directory to see if it is a json file
+                while (cursor.moveToNext()) {
+                    String docId = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID));
+                    String mimeType = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE));
+                    String displayName = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME));
+                    long lastModified = cursor.getLong(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_LAST_MODIFIED));
+
+
+                    // Fallback: try detecting mime type from file fails
+                    if (mimeType == null || mimeType.equals("application/octet-stream")) {
+                        mimeType = getMimeType(displayName);
+                    }
+                    if (mimeType == null || DocumentsContract.Document.MIME_TYPE_DIR.equals(mimeType)) continue;
+
+                    Uri fileUri = DocumentsContract.buildDocumentUriUsingTree(directoryUri, docId);
+                    if (mimeType.equals("application/json")) {
+                        // If it is a json file, parse the playlist and add it to the list.
+                        ArrayList<String> songNames = new ArrayList<>();
+
+                        // This parses everything but the songs
+                        Playlist playlist = parsePlaylistFromJsonFile(context, fileUri, directoryUri, songNames);
+                        if (playlist != null) {
+                            listOfPlaylists.add(playlist);
+                            playlistsSongsOrdered.put(playlist.getJsonUri(), songNames);
+                        }
+                    }
+                    else if(mimeType.startsWith("audio/")) {
+                        // Add song to list
+                        String targetTitle = FileUtils.removeExtensionFromName(displayName);
+                        audioUris.put(targetTitle.trim(), new Song(targetTitle, fileUri, lastModified));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error finding all json files", e);
+        }
+
+        // Build each playlist
+        for(Playlist playlist : listOfPlaylists) {
+            Uri jsonUri = playlist.getJsonUri();
+            if(!playlistsSongsOrdered.containsKey(jsonUri)) {
+                continue;
+            }
+
+            // Build the playlist with the set of songs in order
+            List<String> songs = playlistsSongsOrdered.get(jsonUri);
+            List<Song> toBeAdded = new ArrayList<>();
+            for(String songName : songs) {
+                if(audioUris.containsKey(songName)) {
+                    toBeAdded.add(audioUris.get(songName));
+                }
+            }
+            playlist.setSongs(toBeAdded);
+        }
+
+        return listOfPlaylists;
+    }
+
+
+    /**
+     * Parses a single JSON file into a Playlist object. It does not resolve the songs.
+     *
+     * @param context      The context used to access the content resolver.
+     * @param jsonUri      The Uri of the playlist JSON file.
+     * @param directoryUri The Uri of the directory containing the audio files.
+     * @return A Playlist object constructed from the JSON file, or null on failure.
+     */
+    public static Playlist parsePlaylistFromJsonFile(Context context, Uri jsonUri, Uri directoryUri, ArrayList<String> songNames) {
+        if(jsonUri == null || directoryUri == null) return null;
+
+        ContentResolver resolver = context.getApplicationContext().getContentResolver();
+
+        try (InputStream inputStream = resolver.openInputStream(jsonUri);
+             InputStreamReader isReader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
+             BufferedReader reader = new BufferedReader(isReader)) {
+
+            // Parse from reader
+            JsonElement element = JsonParser.parseReader(reader);
+            if (element == null || !element.isJsonObject()) {
+                Log.e(TAG, "Invalid or empty JSON content.");
+                return null;
+            }
+            JsonObject root = element.getAsJsonObject();
+
+            // Ensures that the json file is a valid playlist
+            if (!root.has("songs") || !root.has("name") || !root.has("lastPlayed")) {
+                return null;
+            }
+
+            // Read the name and last played from the json
+            String name = root.get("name").getAsString();
+            long lastPlayed = root.get("lastPlayed").getAsLong();
+
+
+            // Keeps track of songs in a set
+            JsonArray songs = root.getAsJsonArray("songs");
+            for (int i = 0; i < songs.size(); i++) {
+                String songName = songs.get(i).getAsString().trim();
+                songNames.add(songName);
+            }
+
+            // Empty playlist, which is acceptable.
+            return new Playlist(jsonUri, null, name, lastPlayed);
+        } catch (Exception e) {
+            Log.e(TAG, "Error reading playlist JSON", e);
+            return null;
+        }
     }
 }

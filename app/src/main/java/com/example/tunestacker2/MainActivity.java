@@ -86,7 +86,7 @@ public class MainActivity extends AppCompatActivity implements LibraryFragment.L
 
 
     // Data for tabs
-    private static final String[] TAB_TITLES = {"Library", "Playlist", "Settings"};
+    private static final String[] TAB_TITLES = {"Library", "Playlists", "Settings"};
     private static final int[] TAB_ICONS = {
             R.drawable.baseline_library_music_24,
             R.drawable.baseline_playlist_play_24,

@@ -5,7 +5,7 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingHorizontal="12dp"
+    android:paddingHorizontal="4dp"
     android:paddingVertical="8dp"
     android:background="?attr/selectableItemBackground"
     android:clickable="true"
@@ -49,8 +49,8 @@
     <!-- Three-dot menu -->
     <ImageButton
         android:id="@+id/optionsButton"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
+        android:layout_width="32dp"
+        android:layout_height="60dp"
         android:layout_marginStart="12dp"
         android:src="@drawable/baseline_more_vert_24"
         android:background="?attr/selectableItemBackgroundBorderless"

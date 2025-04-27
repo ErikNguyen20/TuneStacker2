@@ -57,7 +57,24 @@
                 android:layout_height="wrap_content"
                 android:text="Embed Thumbnail"
                 android:textColor="@color/white"
-                app:trackTint="@color/material_switch_color"
+                app:trackTint="@color/material_switch_track_color"
+                android:textSize="16sp" />
+
+            <View
+                android:id="@+id/divider5"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="10dp"
+                android:background="?android:attr/listDivider" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/embedMetadataSwitch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Embed Metadata"
+                android:textColor="@color/white"
+                app:trackTint="@color/material_switch_track_color"
+                app:thumbTint="@color/material_switch_thumb_color"
                 android:textSize="16sp" />
 
             <View
@@ -158,7 +175,7 @@
                 android:layout_height="wrap_content"
                 android:text="Enable Auto Update"
                 android:textColor="@color/white"
-                app:trackTint="@color/material_switch_color"
+                app:trackTint="@color/material_switch_track_color"
                 android:textSize="16sp" />
 
             <View

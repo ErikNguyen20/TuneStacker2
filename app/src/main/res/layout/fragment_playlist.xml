@@ -47,7 +47,7 @@
             android:id="@+id/editPlaylistName"
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:hint="Name your playlist"
             android:textColorHint="@color/light_gray"
             android:inputType="textCapSentences"
@@ -55,6 +55,7 @@
             android:paddingStart="8dp"
             android:textSize="16sp"
             android:textColor="@color/white"
+            android:imeOptions="actionDone"
             />
 
         <Button

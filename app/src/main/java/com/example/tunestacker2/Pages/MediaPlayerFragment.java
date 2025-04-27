@@ -31,7 +31,6 @@ import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
-import com.example.tunestacker2.Data.TempDataHolder;
 import com.example.tunestacker2.MusicPlayer.MediaPlayerService;
 import com.example.tunestacker2.MusicPlayer.Song;
 import com.example.tunestacker2.MusicPlayer.ThumbnailLoader;
@@ -41,7 +40,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 
@@ -54,7 +52,6 @@ public class MediaPlayerFragment extends Fragment {
     // --- Constants ---
     private static final String TAG = "MediaPlayerFragment";
     private static final String ARG_SONG_LIST = "arg_song_list";
-    private static final String ARG_SONG_LIST_KEY = "arg_song_list_key";
     private static final String ARG_CURRENT_SONG_INDEX = "arg_current_song_index";
     private static final String ARG_REPEAT_STATE = "arg_repeat_state";
     private static final int MAX_BUNDLE_SIZE_BYTES = 1024 * 1024; // 1MB
@@ -158,29 +155,41 @@ public class MediaPlayerFragment extends Fragment {
         Bundle args = new Bundle();
 
         // Try putting into bundle
-        ArrayList<Song> songList = new ArrayList<>(songs);
-        args.putParcelableArrayList(MediaPlayerFragment.ARG_SONG_LIST, songList);
+        ArrayList<Song> songList = new ArrayList<>();
         args.putInt(MediaPlayerFragment.ARG_CURRENT_SONG_INDEX, pos);
         args.putInt(MediaPlayerFragment.ARG_REPEAT_STATE, state);
 
-        // Check size to ensure it doesn't exceed the limit
-        Parcel parcel = Parcel.obtain();
-        args.writeToParcel(parcel, 0);
-        int sizeInBytes = parcel.dataSize();
-        parcel.recycle();
+        // If we suspect that the list of too large, check the datasize
+        if(songs != null && songs.size() >= 1024) {
 
-        if (sizeInBytes > MAX_BUNDLE_SIZE_BYTES) {
-            Log.w("MediaPlayerFragment", "Bundle too large (" + sizeInBytes + " bytes). Using fallback.");
+            // Check size to ensure it doesn't exceed the limit
+            Parcel parcel = Parcel.obtain();
+            args.writeToParcel(parcel, 0);
+            int sizeInBytes = parcel.dataSize();
+            parcel.recycle();
 
-            // Fallback: remove song list from bundle
-            args.remove(MediaPlayerFragment.ARG_SONG_LIST);
+            if (sizeInBytes > MAX_BUNDLE_SIZE_BYTES) {
+                Log.w("MediaPlayerFragment", "Bundle too large (" + sizeInBytes + " bytes). Using fallback.");
 
-            // Generate a unique key and store in temp holder
-            String dataKey = UUID.randomUUID().toString();
-            TempDataHolder.put(dataKey, songs);
-            args.putString(ARG_SONG_LIST_KEY, dataKey);
+                // Calculate the average size of each song in the list and take only 0.9 of that
+                float avg_per_song_size = (float) sizeInBytes / songs.size();
+                int windowSize = (int) (MAX_BUNDLE_SIZE_BYTES * 0.9f / avg_per_song_size);
+                int half_window = windowSize / 2;
+
+                int remaining = Math.max(0, half_window - pos);
+                int start = Math.max(0, pos - half_window);
+                int end = Math.min(songs.size(), pos + half_window + remaining);
+
+                songList.addAll(songs.subList(start, end));
+                args.putParcelableArrayList(MediaPlayerFragment.ARG_SONG_LIST, songList);
+                fragment.setArguments(args);
+                return fragment;
+            }
         }
 
+        // Otherwise just add the entire playlist
+        if(songs != null) songList.addAll(songs);
+        args.putParcelableArrayList(MediaPlayerFragment.ARG_SONG_LIST, songList);
         fragment.setArguments(args);
         return fragment;
     }
@@ -193,16 +202,6 @@ public class MediaPlayerFragment extends Fragment {
         if (getArguments() != null) {
             Bundle args = getArguments();
             songList = args.getParcelableArrayList(ARG_SONG_LIST);
-
-            // Check fallback key if list is null
-            if (songList == null) {
-                String dataKey = args.getString(ARG_SONG_LIST_KEY);
-                if (dataKey != null) {
-                    songList = new ArrayList<>(TempDataHolder.get(dataKey));
-                    TempDataHolder.remove(dataKey); // Clean up after retrieving
-                }
-            }
-
             currentSongIndex = args.getInt(ARG_CURRENT_SONG_INDEX);
             repeatState = args.getInt(ARG_REPEAT_STATE);
 

@@ -30,18 +30,13 @@ public class Song implements Parcelable {
 
     /**
      * Full constructor with all fields.
-     * @param fileName The file name of the audio file.
+     * @param fileName The display name of the audio.
      * @param audioUri The URI pointing to the file.
      * @param lastModified Timestamp indicating when the file was last modified.
      */
     public Song(String fileName, Uri audioUri, long lastModified) {
         this.audioUri = audioUri;
-
-        String targetTitle = fileName;
-        if (fileName != null && fileName.contains(".")) {
-            targetTitle = fileName.substring(0, fileName.lastIndexOf("."));
-        }
-        this.title = targetTitle;
+        this.title = fileName;
         this.lastModified = lastModified;
     }
 

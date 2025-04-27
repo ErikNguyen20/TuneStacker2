@@ -139,7 +139,12 @@
                 app:iconGravity="textStart"
                 app:cornerRadius="12dp"
                 app:iconTint="@android:color/white"
-                app:backgroundTint="@color/primary_theme" />
+                app:backgroundTint="@color/primary_theme"
+                app:autoSizeTextType="uniform"
+                app:autoSizeMinTextSize="8sp"
+                app:autoSizeMaxTextSize="14sp"
+                app:autoSizeStepGranularity="1sp"
+                />
 
 
             <Space
@@ -160,7 +165,12 @@
                 app:strokeWidth="1dp"
                 app:cornerRadius="12dp"
                 app:iconTint="@android:color/white"
-                app:backgroundTint="@color/semitransparent_dark" />
+                app:backgroundTint="@color/semitransparent_dark"
+                app:autoSizeTextType="uniform"
+                app:autoSizeMinTextSize="8sp"
+                app:autoSizeMaxTextSize="14sp"
+                app:autoSizeStepGranularity="1sp"
+                />
         </LinearLayout>
 
         <!-- Horizontal song list -->

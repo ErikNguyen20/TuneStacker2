@@ -119,7 +119,7 @@ public class DataManager {
         if (Settings.GetAudioDirectory() == null) return;
 
         executor.execute(() -> {
-            playlists = FileUtils.playlistsFromJsonFiles(context, Settings.GetAudioDirectory());
+            playlists = FileUtils.batchedPlaylistsFromJsonFiles(context, Settings.GetAudioDirectory());
 
             // Post result to UI thread
             if(callback != null) handler.post(() -> callback.accept(playlists));
@@ -156,12 +156,20 @@ public class DataManager {
         Uri audioDir = Settings.GetAudioDirectory();
 
         executor.execute(() -> {
-            List<Playlist> existingPlaylists = FileUtils.playlistsFromJsonFiles(context, audioDir);
+            List<Playlist> existingPlaylists = FileUtils.batchedPlaylistsFromJsonFiles(context, audioDir);
 
-            // Check for duplicates
+            // Check for duplicates display names
             for (Playlist playlist : existingPlaylists) {
                 if (playlist.getTitle().equals(playlistName)) {
-                    if(callback != null) handler.post(() -> callback.accept("Playlist already exists."));
+                    if(callback != null) handler.post(() -> callback.accept("Playlist name already exists."));
+                    return;
+                }
+            }
+
+            // Check for duplicate file names
+            for (Playlist playlist : existingPlaylists) {
+                if (FileUtils.getFileNameWithoutExtensionFromUri(context, playlist.getJsonUri()).equals(playlistName)) {
+                    if(callback != null) handler.post(() -> callback.accept("Playlist File of this name already exists."));
                     return;
                 }
             }
@@ -219,7 +227,7 @@ public class DataManager {
 
         String cleanName = FileUtils.sanitizeFilename(newName);
         executor.execute(() -> {
-            List<Playlist> existingPlaylists = FileUtils.playlistsFromJsonFiles(context, Settings.GetAudioDirectory());
+            List<Playlist> existingPlaylists = FileUtils.batchedPlaylistsFromJsonFiles(context, Settings.GetAudioDirectory());
 
             // Check for duplicates
             for (Playlist playlist : existingPlaylists) {
@@ -388,6 +396,7 @@ public class DataManager {
         private static final String PREF_KEY_LIBRARY_URI = "library_uri";
         private static final String PREF_KEY_FILE_EXTENSION = "file_extension";
         private static final String PREF_KEY_EMBED_THUMBNAIL = "embed_thumbnail";
+        private static final String PREF_KEY_EMBED_METADATA = "embed_metadata";
         private static final String PREF_KEY_AUTO_UPDATE = "auto_update";
         private static final String PREF_KEY_SORT_ORDER = "sort_order";
 
@@ -395,6 +404,7 @@ public class DataManager {
         private static Uri libraryUri;
         private static String fileExtension;
         private static boolean embedThumbnail;
+        private static boolean embedMetadata;
         private static boolean autoUpdate;
         private static int sortOrder;
 
@@ -520,6 +530,26 @@ public class DataManager {
 
         public static int GetSortOrder() {
             return sortOrder;
+        }
+
+        public static void SetEmbedMetadata(boolean embed) {
+            Context ctx = DataManager.getInstance().context;
+            ctx.getSharedPreferences(DataManager.SHARED_PREFERENCE_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(Settings.PREF_KEY_EMBED_METADATA, embed)
+                    .apply();
+            embedMetadata = embed;
+        }
+
+        private static void LoadEmbedMetadata() {
+            Context ctx = DataManager.getInstance().context;
+            boolean embed = ctx.getSharedPreferences(DataManager.SHARED_PREFERENCE_NAME, Context.MODE_PRIVATE)
+                    .getBoolean(Settings.PREF_KEY_EMBED_METADATA, false);
+            embedMetadata = embed;
+        }
+
+        public static boolean GetEmbedMetadata() {
+            return embedMetadata;
         }
     }
 }

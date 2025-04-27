@@ -195,7 +195,7 @@ public class ForegroundDownloadService extends Service {
      */
     private File yt_dlp_download(String url) throws RuntimeException, InterruptedException {
         // Retrieve information about the video
-        String title = null;
+        VideoInfo streamInfo = null;
 
         boolean retry = true;
         final int MAX_FETCH_RETRIES = 6;
@@ -208,8 +208,7 @@ public class ForegroundDownloadService extends Service {
                 YoutubeDLRequest request = new YoutubeDLRequest(url);
                 request.addOption("--no-playlist");
                 // request.addOption("--no-check-certificates");
-                VideoInfo streamInfo = YoutubeDL.getInstance().getInfo(request);
-                title = streamInfo.getTitle();
+                streamInfo = YoutubeDL.getInstance().getInfo(request);
                 retry = false;
             } catch (YoutubeDLException | InterruptedException | YoutubeDL.CanceledException e) {
                 // Check if thread is canceled
@@ -238,11 +237,11 @@ public class ForegroundDownloadService extends Service {
 
 
         // Sanitize the title, check if file already was downloaded
-        if(title == null) {
+        if(streamInfo == null || streamInfo.getTitle() == null) {
             Log.e(ForegroundDownloadService.TAG, "Failed to fetch video info.");
             throw new RuntimeException("Failed to fetch video info.");
         }
-        title = FileUtils.sanitizeFilename(title);
+        String title = FileUtils.sanitizeFilename(streamInfo.getTitle());
         String ext = DataManager.Settings.GetFileExtension();
         if (FileUtils.findFileInDirectory(getApplicationContext(), DataManager.Settings.GetAudioDirectory(), title + "." + ext) != null) {
             Log.e(ForegroundDownloadService.TAG, "File already exists!");
@@ -264,9 +263,33 @@ public class ForegroundDownloadService extends Service {
                 // request.addOption("--no-check-certificates");
                 // request.addOption("--extractor-args", "youtube:player_client=default,-web"); // ADDED RECENTLY
                 request.addOption("--no-mtime");
+
                 if (DataManager.Settings.GetEmbedThumbnail()) {
                     request.addOption("--embed-thumbnail");
                 }
+
+                if(DataManager.Settings.GetEmbedMetadata()) {
+                    request.addOption("--embed-metadata");
+
+                    request.addOption("--parse-metadata", ":(?P<meta_title>" + title + ")");
+                    String artist = streamInfo.getUploader();
+                    if(artist != null) {
+                        artist = FileUtils.sanitizeFilename(artist);
+                        request.addOption("--parse-metadata", ":(?P<meta_artist>" + artist + ")");
+                    }
+
+                    // Remove metadata fields that we don't care about
+                    request.addOption("--parse-metadata", ":(?P<meta_date>)");
+                    request.addOption("--parse-metadata", ":(?P<meta_description>)");
+                    request.addOption("--parse-metadata", ":(?P<meta_synopsis>)");
+                    request.addOption("--parse-metadata", ":(?P<meta_comment>)");
+                    request.addOption("--parse-metadata", ":(?P<meta_disc>)");
+                    request.addOption("--parse-metadata", ":(?P<meta_show>)");
+                    request.addOption("--parse-metadata", ":(?P<meta_season_number>)");
+                    request.addOption("--parse-metadata", ":(?P<meta_episode_id>)");
+                    request.addOption("--parse-metadata", ":(?P<meta_episode_sort>)");
+                }
+
                 request.addOption("--min-sleep-interval", 1 + 2*i);
                 request.addOption("--max-sleep-interval", 4 + 3*i);
                 request.addOption("--sleep-requests", 1 + 2*i);

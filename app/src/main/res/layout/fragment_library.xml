@@ -51,6 +51,7 @@
                 android:textSize="16sp"
                 android:textColor="@android:color/white"
                 android:textColorHint="#99FFFFFF"
+                android:imeOptions="actionDone"
                 />
 
             <ImageButton
@@ -65,24 +66,42 @@
         </LinearLayout>
 
         <!-- Horizontal song list -->
-        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-            android:id="@+id/swipeRefreshLayout"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginTop="16dp"
-            android:paddingBottom="16dp"
-            >
+            android:layout_height="match_parent">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/songRecyclerView"
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/swipeRefreshLayout"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:clipToPadding="false"
-                android:orientation="horizontal"
-                android:overScrollMode="never"
-                />
+                android:layout_marginTop="16dp"
+                android:paddingBottom="16dp">
 
-        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/songRecyclerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:orientation="horizontal"
+                    android:overScrollMode="never" />
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/scrollToTopButton"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                app:fabCustomSize="32dp"
+                app:maxImageSize="24dp"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginBottom="32dp"
+                android:visibility="gone"
+                app:backgroundTint="@color/semitransparent_background"
+                app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.Circle"
+                android:src="@drawable/vertical_align_top_24px"
+                app:useCompatPadding="true"
+                />
+        </FrameLayout>
+
 
     </LinearLayout>
 

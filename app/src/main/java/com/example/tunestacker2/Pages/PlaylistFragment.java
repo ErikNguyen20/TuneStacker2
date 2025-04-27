@@ -17,6 +17,7 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
@@ -150,6 +151,14 @@ public class PlaylistFragment extends Fragment {
         swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout);
 
         btnAddPlaylist.setOnClickListener(v -> addPlaylist());
+        editPlaylistName.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                // Hide keyboard
+                hideKeyboard(editPlaylistName);
+                return true;
+            }
+            return false;
+        });
     }
 
     /**
@@ -163,8 +172,8 @@ public class PlaylistFragment extends Fragment {
         playlistAdapter = new PlaylistAdapter(requireContext(), playlistList, new PlaylistAdapter.PlaylistAdapterListener() {
             @Override
             public void onPlaylistClicked(int pos) {
-                // Handle playlist item clicks
-                if (pos >= 0 && pos < playlistList.size()) {
+                // Handle playlist item clicks (If its the first one, don't bother updating)
+                if (pos > 0 && pos < playlistList.size()) {
                     Playlist playlist = playlistList.get(pos);
                     if (listener != null) listener.onLaunchPlaylistEditor(playlist);
 
@@ -263,6 +272,7 @@ public class PlaylistFragment extends Fragment {
         if (imm != null) {
             imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
         }
+        view.clearFocus();
     }
 
     /**

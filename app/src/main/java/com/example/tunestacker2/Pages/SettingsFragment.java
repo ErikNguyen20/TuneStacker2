@@ -61,6 +61,7 @@ public class SettingsFragment extends Fragment {
     private Button pickDirectoryButton;
     private Spinner fileExtensionPicker;
     private MaterialSwitch embedThumbnailSwitch;
+    private MaterialSwitch embedMetadataSwitch;
     private MaterialSwitch autoUpdateSwitch;
     private Button forceUpdateButton;
 
@@ -150,6 +151,7 @@ public class SettingsFragment extends Fragment {
         pickDirectoryButton = view.findViewById(R.id.pickDirectoryButton);
         fileExtensionPicker = view.findViewById(R.id.fileExtensionPicker);
         embedThumbnailSwitch = view.findViewById(R.id.embedThumbnailSwitch);
+        embedMetadataSwitch = view.findViewById(R.id.embedMetadataSwitch);
         forceUpdateButton = view.findViewById(R.id.forceUpdateButton);
         autoUpdateSwitch = view.findViewById(R.id.autoUpdateSwitch);
     }
@@ -226,6 +228,12 @@ public class SettingsFragment extends Fragment {
         embedThumbnailSwitch.setChecked(DataManager.Settings.GetEmbedThumbnail());
         embedThumbnailSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             DataManager.Settings.SetEmbedThumbnail(isChecked);
+        });
+
+        // Set up the metadata switch listener
+        embedMetadataSwitch.setChecked(DataManager.Settings.GetEmbedMetadata());
+        embedMetadataSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            DataManager.Settings.SetEmbedMetadata(isChecked);
         });
 
         // Set up the update switch listener
