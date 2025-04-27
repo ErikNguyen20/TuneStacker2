@@ -26,7 +26,7 @@ One of its standout features? 🎬 **It can download and play audio from YouTube
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/6d11dedc-9420-4c86-820b-b1123f3e17f8" width="45%" alt="TuneStacker Screenshot 1"/>
-  <img src="https://github.com/user-attachments/assets/5fde472d-962e-4e86-8be9-88cb19e00666" width="45%" alt="TuneStacker Screenshot 2"/>
+  <img src="https://github.com/user-attachments/assets/6e909295-f1ec-4cbc-b7ec-740017c8c833" width="48.6%" alt="TuneStacker Screenshot 2"/>
 </p>
 
 ---
@@ -35,7 +35,6 @@ One of its standout features? 🎬 **It can download and play audio from YouTube
 
 You can grab the latest APK from the [Releases](../../releases) page.
 
-Or install manually:
 1. Download the latest `app-release.apk`
 2. Transfer it to your Android device
 3. Open the file and allow "Install Unknown Apps" if prompted
@@ -54,7 +53,7 @@ Or install manually:
 ## 🛠 Developer Notes
 
 Built using:
-- Java (not Kotlin)
+- Java
 - Minimum Android SDK 24
 - Android SDK 35 (target)
 - Android Libraries
