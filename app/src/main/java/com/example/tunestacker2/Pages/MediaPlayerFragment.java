@@ -414,12 +414,8 @@ public class MediaPlayerFragment extends Fragment {
         });
         recyclerView.setAdapter(playerAdapter);
 
-        // Set animation speed
-        RecyclerView.ItemAnimator animator = recyclerView.getItemAnimator();
-        if (animator != null) {
-            animator.setChangeDuration(50);
-        }
-
+        // Disable animations
+        recyclerView.setItemAnimator(null);
     }
 
     /**

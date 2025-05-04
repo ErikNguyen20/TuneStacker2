@@ -36,6 +36,7 @@ import android.widget.Toast;
 
 import com.example.tunestacker2.Data.DataManager;
 import com.example.tunestacker2.Data.FileUtils;
+import com.example.tunestacker2.Data.ForegroundDownloadService;
 import com.example.tunestacker2.MusicPlayer.Song;
 import com.example.tunestacker2.R;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -238,7 +239,7 @@ public class LibraryFragment extends Fragment {
                         hideRunnable = () -> {
                             if (scrollToTopButton != null) scrollToTopButton.hide();
                         };
-                        handler.postDelayed(hideRunnable, 3000);
+                        handler.postDelayed(hideRunnable, 2000);
                     } else {
                         if(scrollToTopButton != null) scrollToTopButton.hide();
 
@@ -672,6 +673,11 @@ public class LibraryFragment extends Fragment {
      */
     private void OpenDownloadDialog() {
         if (!isAdded() || getContext() == null) return;
+
+        if (DataManager.Settings.GetAudioDirectory() == null) {
+            Toast.makeText(requireContext(), "Set your audio directory in 'Settings'", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         // Inflate the custom dialog layout
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_download_popup, null);

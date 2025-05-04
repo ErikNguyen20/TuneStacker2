@@ -196,10 +196,11 @@ public class FileUtils {
             if (cursor != null) {
                 // Iterate over every document and see if the file name matches
                 while (cursor.moveToNext()) {
-                    String documentId = cursor.getString(0);
-                    String displayName = cursor.getString(1);
+                    String documentId = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID));
+                    String displayName = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME));
 
-                    if (displayName != null && displayName.equalsIgnoreCase(targetFileName)) {
+                    String targetTitle = FileUtils.removeExtensionFromName(displayName);
+                    if (targetTitle != null && targetTitle.equals(targetFileName)) {
                         return DocumentsContract.buildDocumentUriUsingTree(directoryUri, documentId);
                     }
                 }
@@ -209,6 +210,45 @@ public class FileUtils {
         }
 
         return null;
+    }
+
+    /**
+     * Searches for a specific file names within a given directory Uri and returns the missing ones.
+     *
+     * @param context        The context used to access the content resolver.
+     * @param directoryUri   The Uri of the directory to search within.
+     * @param fileNames      The name of the files to search for.
+     * @return The missing file names.
+     */
+    public static Set<String> findMissingFilesInDirectory(Context context, Uri directoryUri, Set<String> fileNames) {
+        Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                directoryUri,
+                DocumentsContract.getTreeDocumentId(directoryUri)
+        );
+
+        try (Cursor cursor = context.getApplicationContext().getContentResolver().query(childrenUri,
+                new String[]{
+                        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                        DocumentsContract.Document.COLUMN_DISPLAY_NAME
+                }, null, null, null)) {
+
+            if (cursor != null) {
+                // Iterate over every document and see if the file name matches
+                while (cursor.moveToNext()) {
+                    String documentId = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID));
+                    String displayName = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME));
+
+                    String targetTitle = FileUtils.removeExtensionFromName(displayName);
+                    if (targetTitle != null) {
+                        fileNames.remove(targetTitle);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error finding missing files in directory", e);
+        }
+
+        return fileNames;
     }
 
     /**
@@ -439,10 +479,7 @@ public class FileUtils {
                         }
 
                         // Add song to list (compares to file name without extension) if it is part of the playlist
-                        String targetTitle = displayName;
-                        if (displayName.contains(".")) {
-                            targetTitle = displayName.substring(0, displayName.lastIndexOf("."));
-                        }
+                        String targetTitle = FileUtils.removeExtensionFromName(displayName);
                         if (playlistSet.contains(targetTitle.trim())) {
                             Uri fileUri = DocumentsContract.buildDocumentUriUsingTree(directoryUri, docId);
                             playlistMap.put(targetTitle, new Song(targetTitle, fileUri, lastModified));

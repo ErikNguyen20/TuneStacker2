@@ -367,7 +367,7 @@ public class PlaylistEditorFragment extends Fragment {
                         hideRunnable = () -> {
                             if (scrollToTopButton != null) scrollToTopButton.hide();
                         };
-                        handler.postDelayed(hideRunnable, 3000);
+                        handler.postDelayed(hideRunnable, 2000);
                     } else {
                         if(scrollToTopButton != null) scrollToTopButton.hide();
 

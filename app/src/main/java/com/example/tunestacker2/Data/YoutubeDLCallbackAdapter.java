@@ -4,9 +4,9 @@ import kotlin.Unit;
 import kotlin.jvm.functions.Function3;
 
 public class YoutubeDLCallbackAdapter implements Function3<Float, Long, String, Unit> {
-    private final DownloaderCallback downloaderCallback;
+    private final YtDLPDownloaderCallback downloaderCallback;
 
-    public YoutubeDLCallbackAdapter(DownloaderCallback downloaderCallback) {
+    public YoutubeDLCallbackAdapter(YtDLPDownloaderCallback downloaderCallback) {
         this.downloaderCallback = downloaderCallback;
     }
 

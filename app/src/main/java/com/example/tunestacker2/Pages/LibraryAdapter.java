@@ -119,7 +119,8 @@ public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.SongView
 
 
         // Load the thumbnail asynchronously
-        ThumbnailLoader.loadThumbnailAsync(song, context, bitmap -> {
+        holder.thumbnail.setImageBitmap(ThumbnailLoader.loadThumbnailSync(song, context.getApplicationContext()));
+        ThumbnailLoader.loadThumbnailAsync(song, context.getApplicationContext(), bitmap -> {
             if (holder != null && holder.thumbnail != null &&
                     holder.thumbnail.getTag().equals(song.getAudioUri().toString())) {
                 holder.thumbnail.setImageBitmap(bitmap);

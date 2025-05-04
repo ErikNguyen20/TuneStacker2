@@ -64,13 +64,12 @@ public class MediaPlayerAdapter extends RecyclerView.Adapter<MediaPlayerAdapter.
         Song song = songs.get(position);
         holder.songTitle.setText(song.getTitle());
 
-        // Set placeholder first (important for recycling!)
-        holder.thumbnail.setImageResource(ThumbnailLoader.DEFAULT_THUMBNAIL);
-
         // Tag the view to track recycling
         holder.thumbnail.setTag(song.getAudioUri().toString());
 
-        ThumbnailLoader.loadThumbnailAsync(song, context, bitmap -> {
+        // Set placeholder first (important for recycling!)
+        holder.thumbnail.setImageBitmap(ThumbnailLoader.loadThumbnailSync(song, context.getApplicationContext()));
+        ThumbnailLoader.loadThumbnailAsync(song, context.getApplicationContext(), bitmap -> {
             if (holder != null && holder.thumbnail != null &&
                     holder.thumbnail.getTag().equals(song.getAudioUri().toString())) {
                 holder.thumbnail.setImageBitmap(bitmap);

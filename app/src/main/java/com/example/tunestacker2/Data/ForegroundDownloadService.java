@@ -20,6 +20,12 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.documentfile.provider.DocumentFile;
 
+import com.example.tunestacker2.MusicPlayer.Song;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
 import com.yausername.youtubedl_android.YoutubeDL;
 import com.yausername.youtubedl_android.YoutubeDLException;
 import com.yausername.youtubedl_android.YoutubeDLRequest;
@@ -30,6 +36,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -41,6 +51,13 @@ import java.util.concurrent.ThreadLocalRandom;
  * It uses youtube-dl to perform the downloads and provides notifications to the user.
  */
 public class ForegroundDownloadService extends Service {
+    public interface DownloadCallback {
+        void progressUpdate(int progress, String titleText, String contentText);
+        void downloadComplete();
+        void downloadError(String errorMessage);
+        void downloadShutdown();
+    }
+
     // --- Constants ---
     public static final String TAG = "FOREGROUND_DOWNLOAD_SERVICE";
     public static final String BROADCAST_ACTION_IDENTIFIER = "FOREGROUND_DOWNLOAD_SERVICE_PROCESS";
@@ -52,6 +69,11 @@ public class ForegroundDownloadService extends Service {
     public static final String INTENT_TERMINATE_KEY = "intent_download_terminate";
     public static final int NOTIF_ID = 1001;
     private static final String PROCESS_ID = "DownloadProcessID";
+
+    private static final int MAX_FETCH_RETRIES = 3;
+    private static final int MAX_DOWNLOAD_RETRIES = 4;
+    private static final int BASE_SLEEP_MS = 1000;
+    private static final int MAX_SLEEP_MS = 32000;
 
     private File youtubeDLDir;
     private ExecutorService executor;
@@ -67,7 +89,6 @@ public class ForegroundDownloadService extends Service {
         createNotificationChannel();
         startForeground(NOTIF_ID, getNotification("Download starting...", "", 0));
 
-        // youtubeDLDir = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "tunestacker-ytdlp");
         youtubeDLDir = new File(getApplicationContext().getFilesDir(), "tunestacker-ytdlp");
         if (!youtubeDLDir.exists()) {
             youtubeDLDir.mkdirs();
@@ -89,7 +110,7 @@ public class ForegroundDownloadService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && intent.hasExtra(ForegroundDownloadService.INTENT_URL_KEY)) {
             String url = intent.getStringExtra(ForegroundDownloadService.INTENT_URL_KEY);
-            startDownload(url);
+            processDownloadRequest(url);
         }
 
         return START_NOT_STICKY;
@@ -147,11 +168,45 @@ public class ForegroundDownloadService extends Service {
     }
 
     /**
+     * Determines the platform a URL belongs to.
+     */
+    public static boolean isValidPlatform(String url) {
+        if (url == null) return false;
+        url = url.toLowerCase();
+
+        return url.contains("youtube.com") ||
+               url.contains("youtu.be") ||
+               url.contains("soundcloud.com") ||
+               url.contains("bandcamp.com") ||
+               url.contains("vimeo.com") ||
+               url.contains("dailymotion.com") ||
+               url.contains("twitch.tv") ||
+               url.contains("bilibili.com") ||
+               url.contains("nicovideo.jp") ||
+               url.contains("niconico");
+    }
+
+    /**
+     * Checks if a URL is a playlist link based on known patterns.
+     */
+    public static boolean isPlaylistUrl(String url) {
+        if (url == null) return false;
+        url = url.toLowerCase();
+
+        return url.contains("/playlist") ||           // General pattern (YouTube, SoundCloud, Bandcamp, etc.)
+               url.contains("/sets/") ||              // SoundCloud sets
+               url.contains("/album/") ||             // Bandcamp albums
+               url.contains("/channel/") ||           // Vimeo, Dailymotion
+               url.contains("/collections/") ||       // Twitch collections
+               url.contains("/series/");              // Bilibili, Niconico, etc.
+    }
+
+    /**
      * Starts the download process for a given URL.
      *
      * @param url The URL to download from.
      */
-    private void startDownload(String url) {
+    private void processDownloadRequest(String url) {
         if (downloadFuture != null && !downloadFuture.isDone()) {
             Log.w(ForegroundDownloadService.TAG, "Download already in progress. Ignoring new request.");
             stopForeground(STOP_FOREGROUND_REMOVE);
@@ -165,55 +220,338 @@ public class ForegroundDownloadService extends Service {
             stopSelf();
             return;
         }
+//        if(!isValidPlatform(url)) {
+//            Log.w(ForegroundDownloadService.TAG, "Invalid URL. Download will not start.");
+//            updateNotification("Download failed", "Invalid URL.", 0, false);
+//            stopForeground(STOP_FOREGROUND_REMOVE);
+//            stopSelf();
+//            return;
+//        }
 
+        if(!isPlaylistUrl(url)) {
+            // Download single song
+            downloadSongProcedure(url, new DownloadCallback() {
+                @Override
+                public void progressUpdate(int progress, String titleText, String contentText) {
+                    updateNotification(titleText, contentText, progress, false);
+                }
+
+                @Override
+                public void downloadComplete() {
+                    updateNotification("Download complete.", "", 100, true);
+                }
+
+                @Override
+                public void downloadError(String errorMessage) {
+                    updateNotification("An error occurred.", (errorMessage != null) ? errorMessage : "", 0, false);
+                }
+
+                @Override
+                public void downloadShutdown() {
+                    stopForeground(STOP_FOREGROUND_REMOVE);
+                    stopSelf();
+                }
+            });
+        }
+        else {
+            // Download playlist
+            downloadPlaylistProcedure(url, new DownloadCallback() {
+                @Override
+                public void progressUpdate(int progress, String titleText, String contentText) {
+                    updateNotification(titleText, contentText, progress, false);
+                }
+
+                @Override
+                public void downloadComplete() {
+                    updateNotification("Download complete.", "", 100, true);
+                }
+
+                @Override
+                public void downloadError(String errorMessage) {
+                    updateNotification("An error occurred.", (errorMessage != null) ? errorMessage : "", 0, false);
+                }
+
+                @Override
+                public void downloadShutdown() {
+                    stopForeground(STOP_FOREGROUND_REMOVE);
+                    stopSelf();
+                }
+            });
+        }
+    }
+
+    /**
+     * Orchestrates the full download process for a single YouTube video.
+     * <p>
+     * This method runs asynchronously in a background thread and performs the following:
+     * <ul>
+     *   <li>Fetches video metadata using yt-dlp</li>
+     *   <li>Sanitizes the video title and checks if the file already exists</li>
+     *   <li>Constructs a {@link YoutubeDLRequest} with appropriate metadata options</li>
+     *   <li>Downloads the audio file with progress reporting via {@link DownloadCallback}</li>
+     *   <li>Moves the downloaded file to the target audio directory</li>
+     * </ul>
+     * <p>
+     * It ensures proper error handling, cancellation support (via thread interruption),
+     * and guaranteed invocation of {@code downloadShutdown()} after completion or failure.
+     *
+     * @param url      The URL of the YouTube video to download.
+     * @param callback A {@link DownloadCallback} to report progress, success, failure, and shutdown.
+     */
+    private void downloadSongProcedure(String url, DownloadCallback callback) {
         downloadFuture = executor.submit(() -> {
             try {
-                Log.i(ForegroundDownloadService.TAG, "Download Started.");
-                File downloadedFile = yt_dlp_download(url);
+                // Retrieve information about the video
+                VideoInfo streamInfo = getVideoInfo(url, callback);
 
-                // If the file was correctly downloaded
+                // Sanitize the title, check if file already was downloaded
+                if(streamInfo.getTitle() == null) {
+                    Log.e(ForegroundDownloadService.TAG, "Failed to fetch video info.");
+                    throw new RuntimeException("Failed to fetch video info.");
+                }
+                String title = FileUtils.sanitizeFilename(streamInfo.getTitle());
+                String artist = streamInfo.getUploader();
+                String ext = DataManager.Settings.GetFileExtension();
+                if (FileUtils.findFileInDirectory(getApplicationContext(), DataManager.Settings.GetAudioDirectory(), title) != null) {
+                    Log.e(ForegroundDownloadService.TAG, "This Audio File already exists!");
+                    throw new RuntimeException("File already exists.");
+                }
+
+                YoutubeDLRequest request = buildDownloadRequest(url, title, ext, artist);
+
+                File downloadedFile = downloadSong(title, ext, request, callback);
                 moveFileToTargetUri(downloadedFile, DataManager.Settings.GetAudioDirectory());
-                updateNotification("Download complete.", "", 100, true);
-                Log.i(ForegroundDownloadService.TAG, "Download Complete.");
+                callback.downloadComplete();
+
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             } catch (Exception e) {
-                // If an exception occurred and it failed to download
-                updateNotification("Unexpected error occurred.", (e.getMessage() != null) ? e.getMessage() : "", 0, false);
+                callback.downloadError(e.getMessage());
             } finally {
-                stopForeground(STOP_FOREGROUND_REMOVE);
-                stopSelf();
+                callback.downloadShutdown();
             }
         });
     }
 
     /**
-     * Downloads a file using youtube-dl.
+     * Initiates the download procedure for a YouTube playlist.
+     * <p>
+     * This method:
+     * <ul>
+     *     <li>Retrieves playlist metadata via {@code GetPlaylistInfo}</li>
+     *     <li>Determines which files are missing in the audio directory</li>
+     *     <li>Downloads missing tracks sequentially using {@code YoutubeDL}</li>
+     *     <li>Handles errors gracefully on a per-track basis</li>
+     *     <li>Notifies the given {@link DownloadCallback} on completion, error, or shutdown</li>
+     * </ul>
+     * </p>
      *
-     * @param url The URL to download from.
-     * @return The downloaded file.
-     * @throws RuntimeException     If an error occurs during download.
-     * @throws InterruptedException If the download is interrupted.
+     * The entire process runs in a background thread using {@code executor.submit()} and can be canceled
+     * safely via {@code downloadFuture.cancel(true)}.
+     *
+     * @param url      The URL of the YouTube playlist to be downloaded.
+     * @param callback The callback used to receive download progress, completion, error, and shutdown events.
      */
-    private File yt_dlp_download(String url) throws RuntimeException, InterruptedException {
-        // Retrieve information about the video
-        VideoInfo streamInfo = null;
+    private void downloadPlaylistProcedure(String url, DownloadCallback callback) {
+        downloadFuture = executor.submit(() -> {
+            try {
+                // Retrieve information about the playlist
+                Map<String, PlaylistVideoInfo> playlistInfo = getPlaylistInfo(url, callback);
+                Set<String> missingNames = FileUtils.findMissingFilesInDirectory(getApplicationContext(), DataManager.Settings.GetAudioDirectory(), playlistInfo.keySet());
 
-        boolean retry = true;
-        final int MAX_FETCH_RETRIES = 6;
-        for (int i = 0; i < MAX_FETCH_RETRIES && retry; i++) {
-            // Check if thread is canceled
+                String ext = DataManager.Settings.GetFileExtension();
+                for(String name : missingNames) {
+                    if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Thread canceled.");
+
+                    try {
+                        // Attempt to download this particular song
+                        PlaylistVideoInfo streamInfo = playlistInfo.get(name);
+                        if (streamInfo == null) continue;
+
+                        String title = streamInfo.getTitle();
+                        String audio_url = streamInfo.getUrl();
+                        String artist = streamInfo.getUploader();
+
+                        YoutubeDLRequest request = buildDownloadRequest(audio_url, title, ext, artist);
+                        File downloadedFile = downloadSong(title, ext, request, callback);
+                        moveFileToTargetUri(downloadedFile, DataManager.Settings.GetAudioDirectory());
+
+                        // Sleep with random delay
+                        int sleepTime = ThreadLocalRandom.current().nextInt(BASE_SLEEP_MS, BASE_SLEEP_MS * 4);
+                        Thread.sleep(sleepTime);
+
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw e; // Rethrow the interrupted exception
+
+                    } catch (Exception e) {
+                        String errorMessage = e.getMessage() != null ? e.getMessage() : "Unknown error";
+                        Log.e(ForegroundDownloadService.TAG, "Failed to download song: " + name + " | " + errorMessage);
+                    }
+                }
+
+                callback.downloadComplete();
+
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (Exception e) {
+                callback.downloadError(e.getMessage());
+            } finally {
+                callback.downloadShutdown();
+            }
+        });
+    }
+
+    /**
+     * Constructs a configured {@link YoutubeDLRequest} for downloading audio from a video URL.
+     *
+     * This method sets flags for metadata embedding, thumbnail embedding, and download options
+     * such as format, rate limiting, sleep intervals, and output path.
+     *
+     * @param url     The direct URL of the YouTube video to be downloaded.
+     * @param title   The desired title of the downloaded file (used in metadata and output path).
+     * @param ext     The audio format to download (e.g., "mp3", "m4a").
+     * @param artist  The artist of the downloaded file (used in metadata and can be null).
+     * @return A fully-configured {@link YoutubeDLRequest} ready for execution.
+     */
+    private YoutubeDLRequest buildDownloadRequest(String url, String title, String ext, String artist) {
+        YoutubeDLRequest request = new YoutubeDLRequest(url);
+        request.addOption("-x");
+        request.addOption("--no-playlist");
+        request.addOption("--retries", 10);
+        request.addOption("--no-mtime");
+
+        if (DataManager.Settings.GetEmbedThumbnail()) {
+            request.addOption("--embed-thumbnail");
+        }
+
+        // Sets flags for metadata
+        if(DataManager.Settings.GetEmbedMetadata()) {
+            request.addOption("--embed-metadata");
+
+            request.addOption("--parse-metadata", ":(?P<meta_title>" + title + ")");
+            if(artist != null) {
+                artist = FileUtils.sanitizeFilename(artist);
+                request.addOption("--parse-metadata", ":(?P<meta_artist>" + artist + ")");
+            }
+
+            // Remove metadata fields that we don't care about
+            request.addOption("--parse-metadata", ":(?P<meta_date>)");
+            request.addOption("--parse-metadata", ":(?P<meta_description>)");
+            request.addOption("--parse-metadata", ":(?P<meta_synopsis>)");
+            request.addOption("--parse-metadata", ":(?P<meta_comment>)");
+            request.addOption("--parse-metadata", ":(?P<meta_disc>)");
+            request.addOption("--parse-metadata", ":(?P<meta_show>)");
+            request.addOption("--parse-metadata", ":(?P<meta_season_number>)");
+            request.addOption("--parse-metadata", ":(?P<meta_episode_id>)");
+            request.addOption("--parse-metadata", ":(?P<meta_episode_sort>)");
+        }
+
+        // Sets workaround for youtube-dl
+        request.addOption("--min-sleep-interval", 1);
+        request.addOption("--max-sleep-interval", 4);
+        request.addOption("--sleep-requests", 1);
+        request.addOption("--retry-sleep", 1);
+        request.addOption("--limit-rate", "2M");
+        request.addOption("--audio-format", ext);
+        request.addOption("-o", youtubeDLDir.getAbsolutePath() + File.separator + title + ".%(ext)s");
+        return request;
+    }
+
+    /**
+     * Executes the audio download operation using a prepared {@link YoutubeDLRequest}.
+     * Retries the download on failure, with randomized sleep intervals.
+     *
+     * This method also uses a {@link DownloadCallback} to report progress updates to the caller.
+     * If the thread is interrupted at any point, the method cancels gracefully.
+     *
+     * @param title    The name of the audio file to be saved.
+     * @param ext      The audio format for the download (e.g., "mp3").
+     * @param request  The pre-configured {@link YoutubeDLRequest} for the download.
+     * @param callback A callback interface to send progress updates (can be UI or background).
+     * @return A {@link File} object representing the downloaded audio file.
+     * @throws InterruptedException If the thread was canceled or interrupted.
+     * @throws RuntimeException If the download fails after all retries.
+     */
+    private File downloadSong(String title, String ext, YoutubeDLRequest request, DownloadCallback callback) throws InterruptedException, RuntimeException {
+        for (int attempt = 1; attempt <= MAX_DOWNLOAD_RETRIES; attempt++) {
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Thread canceled.");
+
+            try {
+                // Download the audio to internal youtube directory
+                callback.progressUpdate(0, title, "Attempt " + attempt + "/" + MAX_DOWNLOAD_RETRIES);
+
+                YtDLPDownloaderCallback execute_callback = new YtDLPDownloaderCallback() {
+                    @Override
+                    public void onProgressUpdate(float progress, long etaInSeconds, String line) {
+                        callback.progressUpdate((int) (progress * 100), title, "Downloading: " + "% (ETA " + etaInSeconds + "s)");
+                    }
+                };
+                YoutubeDLCallbackAdapter adapter = new YoutubeDLCallbackAdapter(execute_callback);
+                YoutubeDLResponse response = YoutubeDL.getInstance().execute(request, PROCESS_ID, adapter);
+
+                // Return the file
+                return new File(youtubeDLDir, title + "." + ext);
+
+            } catch (YoutubeDLException e) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Thread canceled.");
+
+                // Log and report error
+                String errorMessage = e.getMessage() != null ? e.getMessage() : "Unknown error";
+                Log.e(ForegroundDownloadService.TAG, "Download error (attempt " + attempt + "): " + errorMessage);
+                callback.progressUpdate(0, title, "Download error (attempt " + attempt + "): " + errorMessage);
+                if (attempt == MAX_DOWNLOAD_RETRIES) {
+                    throw new RuntimeException("Download failed after retries: " + errorMessage, e);
+                }
+
+                // Retry with a random delay
+                int expBackoff = Math.min(BASE_SLEEP_MS * (1 << attempt), MAX_SLEEP_MS);
+                int jitter = ThreadLocalRandom.current().nextInt(expBackoff / 2 + 1);
+                try {
+                    Thread.sleep(expBackoff + jitter);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    throw ex; // Rethrow the interrupted exception
+                }
+
+            } catch (YoutubeDL.CanceledException | InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new InterruptedException("Thread canceled."); // Rethrow the interrupted exception
+            }
+        }
+
+        throw new RuntimeException("Unexpected download loop exit."); // Should never reach
+    }
+
+    /**
+     * Retrieves metadata information about a YouTube video via yt-dlp.
+     * Retries on transient failures, using exponential backoff with jitter.
+     *
+     * Handles common known exceptions (invalid URL, unavailable or private video),
+     * and gracefully exits on thread interruption.
+     *
+     * @param url      The YouTube video URL to retrieve metadata from.
+     * @param callback A callback to report fetch progress to the caller.
+     * @return A {@link VideoInfo} object containing detailed information about the video.
+     * @throws InterruptedException If the thread was canceled or interrupted.
+     * @throws RuntimeException If the fetch fails due to known video issues or after all retries.
+     */
+    private VideoInfo getVideoInfo(String url, DownloadCallback callback) throws InterruptedException, RuntimeException {
+        for (int attempt = 1; attempt <= MAX_FETCH_RETRIES; attempt++) {
             if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Thread is canceled.");
 
             try {
-                updateNotification("Downloading...", "Fetching Info. Attempt " + (i + 1) + "/" + MAX_FETCH_RETRIES,  0, false);
+                // Retrieve information about the video
+                callback.progressUpdate(0, "Fetching Info.", "Attempt " + attempt + "/" + MAX_FETCH_RETRIES);
+
                 YoutubeDLRequest request = new YoutubeDLRequest(url);
                 request.addOption("--no-playlist");
-                // request.addOption("--no-check-certificates");
-                streamInfo = YoutubeDL.getInstance().getInfo(request);
-                retry = false;
-            } catch (YoutubeDLException | InterruptedException | YoutubeDL.CanceledException e) {
-                // Check if thread is canceled
+                return YoutubeDL.getInstance().getInfo(request);
+
+            } catch (YoutubeDLException e) {
                 if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Thread is canceled.");
 
+                // Handle known exceptions
                 if(e.getMessage() != null) {
                     if(e.getMessage().contains("not a valid URL.")) {
                         throw new RuntimeException("Not a valid URL.");
@@ -223,109 +561,120 @@ public class ForegroundDownloadService extends Service {
                         throw new RuntimeException("Video is Private.");
                     }
                 }
-                Log.e(ForegroundDownloadService.TAG, "Unexpected error on fetch - " + ((e.getMessage() != null) ? e.getMessage() : "An Error has Occurred"));
-
-                // If it failed the last attempt, then return an error.
-                if(i == MAX_FETCH_RETRIES - 1) {
-                    throw new RuntimeException("Fetch Error - " + ((e.getMessage() != null) ? e.getMessage() : "An Error has Occurred"));
+                // Log and report error
+                String errorMessage = e.getMessage() != null ? e.getMessage() : "Unknown error";
+                Log.e(ForegroundDownloadService.TAG, "Fetch error (attempt " + attempt + "): " + errorMessage);
+                callback.progressUpdate(0, "Unexpected Error on Fetch", "Fetch error (attempt " + attempt + "): " + errorMessage);
+                if (attempt == MAX_FETCH_RETRIES) {
+                    throw new RuntimeException("Video Info failed after retries: " + e.getMessage(), e);
                 }
-                Thread.sleep(ThreadLocalRandom.current().nextInt(2000 + 1000*i, 4001 + 1000*i));
+
+                // Retry with a random delay
+                int expBackoff = Math.min(BASE_SLEEP_MS * (1 << attempt), MAX_SLEEP_MS);
+                int jitter = ThreadLocalRandom.current().nextInt(expBackoff / 2 + 1);
+                try {
+                    Thread.sleep(expBackoff + jitter);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    throw ex; // Rethrow the interrupted exception
+                }
+
+            } catch (YoutubeDL.CanceledException | InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new InterruptedException("Thread canceled."); // Rethrow the interrupted exception
             }
         }
-        // Check if thread is canceled
-        if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Thread is canceled.");
 
+        throw new RuntimeException("Failed to fetch info after retries.");
+    }
 
-        // Sanitize the title, check if file already was downloaded
-        if(streamInfo == null || streamInfo.getTitle() == null) {
-            Log.e(ForegroundDownloadService.TAG, "Failed to fetch video info.");
-            throw new RuntimeException("Failed to fetch video info.");
-        }
-        String title = FileUtils.sanitizeFilename(streamInfo.getTitle());
-        String ext = DataManager.Settings.GetFileExtension();
-        if (FileUtils.findFileInDirectory(getApplicationContext(), DataManager.Settings.GetAudioDirectory(), title + "." + ext) != null) {
-            Log.e(ForegroundDownloadService.TAG, "This Audio File already exists!");
-            throw new RuntimeException("File already exists.");
-        }
+    /**
+     * Executes the audio download operation using a prepared {@link YoutubeDLRequest}.
+     * Retries the download on failure, with randomized sleep intervals.
+     *
+     * This method also uses a {@link DownloadCallback} to report progress updates to the caller.
+     * If the thread is interrupted at any point, the method cancels gracefully.
+     *
+     * @param url      The name of the audio file to be saved.
+     * @param callback A callback interface to send progress updates (can be UI or background).
+     * @return A {@link List<Song>} object representing the downloaded audio file.
+     * @throws InterruptedException If the thread was canceled or interrupted.
+     * @throws RuntimeException If the download fails after all retries.
+     */
+    private Map<String, PlaylistVideoInfo> getPlaylistInfo(String url, DownloadCallback callback) throws InterruptedException, RuntimeException {
+        for (int attempt = 1; attempt <= MAX_FETCH_RETRIES; attempt++) {
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Thread canceled.");
 
-
-        //Performs a download operation.
-        retry = true;
-        final int MAX_DOWNLOAD_RETRIES = 3;
-        for (int i = 0; i < MAX_DOWNLOAD_RETRIES && retry; i++) {
             try {
-                if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Thread is canceled.");
+                // Download the audio to internal youtube directory
+                callback.progressUpdate(0, "Fetching Playlist Info.", "Attempt " + attempt + "/" + MAX_FETCH_RETRIES);
 
                 YoutubeDLRequest request = new YoutubeDLRequest(url);
-                request.addOption("-x");
-                request.addOption("--no-playlist");
-                request.addOption("--retries", 10);
-                // request.addOption("--no-check-certificates");
-                // request.addOption("--extractor-args", "youtube:player_client=default,-web"); // ADDED RECENTLY
-                request.addOption("--no-mtime");
+                request.addOption("--dump-single-json");
+                request.addOption("--flat-playlist");
+                request.addOption("--compat-options", "no-youtube-unavailable-videos");
+                YoutubeDLResponse response = YoutubeDL.getInstance().execute(request, null);
+                String jsonOutput = response.getOut();
 
-                if (DataManager.Settings.GetEmbedThumbnail()) {
-                    request.addOption("--embed-thumbnail");
+                // Parse the JSON
+                Map<String, PlaylistVideoInfo> videoList = new HashMap<>();
+                JsonObject jsonObject = JsonParser.parseString(jsonOutput).getAsJsonObject();
+                if (!jsonObject.has("entries") || !jsonObject.get("entries").isJsonArray()) {
+                    throw new RuntimeException("Invalid JSON format from playlist!");
                 }
 
-                if(DataManager.Settings.GetEmbedMetadata()) {
-                    request.addOption("--embed-metadata");
-
-                    request.addOption("--parse-metadata", ":(?P<meta_title>" + title + ")");
-                    String artist = streamInfo.getUploader();
-                    if(artist != null) {
-                        artist = FileUtils.sanitizeFilename(artist);
-                        request.addOption("--parse-metadata", ":(?P<meta_artist>" + artist + ")");
+                JsonArray entries = jsonObject.getAsJsonArray("entries");
+                for (JsonElement entryElement : entries) {
+                    JsonObject entry = entryElement.getAsJsonObject();
+                    // Check if the entry is valid
+                    if (!entry.has("title") || !entry.has("url")) {
+                        continue;
                     }
 
-                    // Remove metadata fields that we don't care about
-                    request.addOption("--parse-metadata", ":(?P<meta_date>)");
-                    request.addOption("--parse-metadata", ":(?P<meta_description>)");
-                    request.addOption("--parse-metadata", ":(?P<meta_synopsis>)");
-                    request.addOption("--parse-metadata", ":(?P<meta_comment>)");
-                    request.addOption("--parse-metadata", ":(?P<meta_disc>)");
-                    request.addOption("--parse-metadata", ":(?P<meta_show>)");
-                    request.addOption("--parse-metadata", ":(?P<meta_season_number>)");
-                    request.addOption("--parse-metadata", ":(?P<meta_episode_id>)");
-                    request.addOption("--parse-metadata", ":(?P<meta_episode_sort>)");
+                    // Extract the title and url
+                    String title = entry.get("title").getAsString();
+                    String video_url = entry.get("url").getAsString();
+                    String uploader = entry.get("uploader").getAsString();
+                    if (title == null || video_url == null || title.isEmpty() || video_url.isEmpty()) {
+                        continue;
+                    }
+
+                    videoList.put(FileUtils.sanitizeFilename(title), new PlaylistVideoInfo(FileUtils.sanitizeFilename(title), video_url, uploader));
                 }
 
-                request.addOption("--min-sleep-interval", 1 + 2*i);
-                request.addOption("--max-sleep-interval", 4 + 3*i);
-                request.addOption("--sleep-requests", 1 + 2*i);
-                request.addOption("--retry-sleep", 2 + 2*i);
-                request.addOption("--limit-rate", "2M");
-                request.addOption("--audio-format", ext);
-                request.addOption("-o", youtubeDLDir.getAbsolutePath() + File.separator + title + ".%(ext)s");
+                // Return the video list
+                return videoList;
 
-                // Implement the YoutubeDL.Callback interface directly.
-                String finalTitle = title;
-                DownloaderCallback callback = new DownloaderCallback() {
-                    @Override
-                    public void onProgressUpdate(float progress, long etaInSeconds, String line) {
-                        updateNotification(finalTitle, "Downloading: " + "% (ETA " + etaInSeconds + "s)", (int) (progress * 100), false);
-                    }
-                };
-                YoutubeDLCallbackAdapter adapter = new YoutubeDLCallbackAdapter(callback);
-                YoutubeDL.getInstance().execute(request, PROCESS_ID, adapter);
-                retry = false;
+            } catch (YoutubeDLException | IllegalStateException | JsonSyntaxException e) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Thread canceled.");
+
+                // Log and report error
+                String errorMessage = e.getMessage() != null ? e.getMessage() : "Unknown error";
+                Log.e(ForegroundDownloadService.TAG, "Fetch error (attempt " + attempt + "): " + errorMessage);
+                callback.progressUpdate(0, "Unexpected Error on Fetch", "Fetch error (attempt " + attempt + "): " + errorMessage);
+                if (attempt == MAX_FETCH_RETRIES) {
+                    throw new RuntimeException("Playlist Info failed after retries: " + e.getMessage(), e);
+                }
+
+                // Retry with a random delay
+                int expBackoff = Math.min(BASE_SLEEP_MS * (1 << attempt), MAX_SLEEP_MS);
+                int jitter = ThreadLocalRandom.current().nextInt(expBackoff / 2 + 1);
+                try {
+                    Thread.sleep(expBackoff + jitter);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    throw ex; // Rethrow the interrupted exception
+                }
+
             } catch (YoutubeDL.CanceledException | InterruptedException e) {
-                throw new InterruptedException("Thread is canceled.");
-            } catch (YoutubeDLException e) {
-                Log.e(ForegroundDownloadService.TAG, "Unexpected error on download - " + ((e.getMessage() != null) ? e.getMessage() : "An Error has Occurred"));
-
-                // If it failed the last attempt, then return an error.
-                if(i == MAX_DOWNLOAD_RETRIES - 1) {
-                    throw new RuntimeException("Download Error - " + ((e.getMessage() != null) ? e.getMessage() : "An Error has Occurred"));
-                }
-                Thread.sleep(ThreadLocalRandom.current().nextInt(4000 + 1000*i, 8001 + 1000*i));
+                Thread.currentThread().interrupt();
+                throw new InterruptedException("Thread canceled."); // Rethrow the interrupted exception
             }
         }
 
-        // Returns the file
-        if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Thread is canceled.");
-        return new File(youtubeDLDir, title + "." + ext);
+        throw new RuntimeException("Unexpected playlist info loop exit."); // Should never reach
     }
+
 
     /**
      * Moves a downloaded file into the SAF directory.
@@ -355,9 +704,11 @@ public class ForegroundDownloadService extends Service {
                 out.write(buffer, 0, len);
             }
             out.flush();
+
         } catch (Exception e) {
             Log.e(ForegroundDownloadService.TAG, "Failed to write target file in SAF directory.");
             throw new RuntimeException("Failed to write target file in SAF directory.");
+
         } finally {
             // Remove source file
             if(sourceFile.exists())  {

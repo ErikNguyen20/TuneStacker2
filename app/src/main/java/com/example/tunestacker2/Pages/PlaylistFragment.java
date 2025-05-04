@@ -261,6 +261,9 @@ public class PlaylistFragment extends Fragment {
                 Toast.makeText(context, "Playlist added", Toast.LENGTH_SHORT).show();
             });
         }
+        else if(DataManager.Settings.GetAudioDirectory() == null) {
+            Toast.makeText(context, "No audio directory selected", Toast.LENGTH_SHORT).show();
+        }
     }
 
     /**
