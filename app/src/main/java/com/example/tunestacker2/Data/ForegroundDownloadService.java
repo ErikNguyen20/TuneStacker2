@@ -207,76 +207,70 @@ public class ForegroundDownloadService extends Service {
      * @param url The URL to download from.
      */
     private void processDownloadRequest(String url) {
-        if (downloadFuture != null && !downloadFuture.isDone()) {
-            Log.w(ForegroundDownloadService.TAG, "Download already in progress. Ignoring new request.");
-            stopForeground(STOP_FOREGROUND_REMOVE);
-            stopSelf();
-            return;
-        }
-        if (!isNetworkAvailable(this)) {
-            Log.w(ForegroundDownloadService.TAG, "No network connection. Download will not start.");
-            updateNotification("Download failed", "No network connection.", 0, false);
-            stopForeground(STOP_FOREGROUND_REMOVE);
-            stopSelf();
-            return;
-        }
-//        if(!isValidPlatform(url)) {
-//            Log.w(ForegroundDownloadService.TAG, "Invalid URL. Download will not start.");
-//            updateNotification("Download failed", "Invalid URL.", 0, false);
-//            stopForeground(STOP_FOREGROUND_REMOVE);
-//            stopSelf();
-//            return;
-//        }
+        synchronized (this) {
+            if (downloadFuture != null && !downloadFuture.isDone()) {
+                Log.w(ForegroundDownloadService.TAG, "Download already in progress. Ignoring new request.");
+                stopForeground(STOP_FOREGROUND_REMOVE);
+                stopSelf();
+                return;
+            }
+            if (!isNetworkAvailable(this)) {
+                Log.w(ForegroundDownloadService.TAG, "No network connection. Download will not start.");
+                updateNotification("Download failed", "No network connection.", 0, false);
+                stopForeground(STOP_FOREGROUND_REMOVE);
+                stopSelf();
+                return;
+            }
 
-        if(!isPlaylistUrl(url)) {
-            // Download single song
-            downloadSongProcedure(url, new DownloadCallback() {
-                @Override
-                public void progressUpdate(int progress, String titleText, String contentText) {
-                    updateNotification(titleText, contentText, progress, false);
-                }
+            if (!isPlaylistUrl(url)) {
+                // Download single song
+                downloadSongProcedure(url, new DownloadCallback() {
+                    @Override
+                    public void progressUpdate(int progress, String titleText, String contentText) {
+                        updateNotification(titleText, contentText, progress, false);
+                    }
 
-                @Override
-                public void downloadComplete() {
-                    updateNotification("Download complete.", "", 100, true);
-                }
+                    @Override
+                    public void downloadComplete() {
+                        updateNotification("Download complete.", "", 100, true);
+                    }
 
-                @Override
-                public void downloadError(String errorMessage) {
-                    updateNotification("An error occurred.", (errorMessage != null) ? errorMessage : "", 0, false);
-                }
+                    @Override
+                    public void downloadError(String errorMessage) {
+                        updateNotification("An error occurred.", (errorMessage != null) ? errorMessage : "", 0, false);
+                    }
 
-                @Override
-                public void downloadShutdown() {
-                    stopForeground(STOP_FOREGROUND_REMOVE);
-                    stopSelf();
-                }
-            });
-        }
-        else {
-            // Download playlist
-            downloadPlaylistProcedure(url, new DownloadCallback() {
-                @Override
-                public void progressUpdate(int progress, String titleText, String contentText) {
-                    updateNotification(titleText, contentText, progress, false);
-                }
+                    @Override
+                    public void downloadShutdown() {
+                        stopForeground(STOP_FOREGROUND_REMOVE);
+                        stopSelf();
+                    }
+                });
+            } else {
+                // Download playlist
+                downloadPlaylistProcedure(url, new DownloadCallback() {
+                    @Override
+                    public void progressUpdate(int progress, String titleText, String contentText) {
+                        updateNotification(titleText, contentText, progress, false);
+                    }
 
-                @Override
-                public void downloadComplete() {
-                    updateNotification("Download complete.", "", 100, true);
-                }
+                    @Override
+                    public void downloadComplete() {
+                        updateNotification("Download complete.", "", 100, true);
+                    }
 
-                @Override
-                public void downloadError(String errorMessage) {
-                    updateNotification("An error occurred.", (errorMessage != null) ? errorMessage : "", 0, false);
-                }
+                    @Override
+                    public void downloadError(String errorMessage) {
+                        updateNotification("An error occurred.", (errorMessage != null) ? errorMessage : "", 0, false);
+                    }
 
-                @Override
-                public void downloadShutdown() {
-                    stopForeground(STOP_FOREGROUND_REMOVE);
-                    stopSelf();
-                }
-            });
+                    @Override
+                    public void downloadShutdown() {
+                        stopForeground(STOP_FOREGROUND_REMOVE);
+                        stopSelf();
+                    }
+                });
+            }
         }
     }
 
@@ -310,6 +304,10 @@ public class ForegroundDownloadService extends Service {
                     throw new RuntimeException("Failed to fetch video info.");
                 }
                 String title = FileUtils.sanitizeFilename(streamInfo.getTitle());
+                if(title.isEmpty()) {
+                    Log.e(ForegroundDownloadService.TAG, "Failed to sanitize title (empty).");
+                    throw new RuntimeException("Failed to sanitize title (empty).");
+                }
                 String artist = streamInfo.getUploader();
                 String ext = DataManager.Settings.GetFileExtension();
                 if (FileUtils.findFileInDirectory(getApplicationContext(), DataManager.Settings.GetAudioDirectory(), title) != null) {
@@ -454,7 +452,7 @@ public class ForegroundDownloadService extends Service {
         request.addOption("--retry-sleep", 1);
         request.addOption("--limit-rate", "2M");
         request.addOption("--audio-format", ext);
-        request.addOption("-o", youtubeDLDir.getAbsolutePath() + File.separator + title + ".%(ext)s");
+        request.addOption("-o", new File(youtubeDLDir, title + ".%(ext)s").getAbsolutePath());
         return request;
     }
 
@@ -484,7 +482,13 @@ public class ForegroundDownloadService extends Service {
                 YtDLPDownloaderCallback execute_callback = new YtDLPDownloaderCallback() {
                     @Override
                     public void onProgressUpdate(float progress, long etaInSeconds, String line) {
-                        callback.progressUpdate((int) (progress * 100), title, "Downloading: " + "% (ETA " + etaInSeconds + "s)");
+                        if(etaInSeconds == -1) {
+                            callback.progressUpdate(0, title, "Preparing Downloader...");
+                            return;
+                        }
+
+                        int percentage = Math.abs((int) progress);
+                        callback.progressUpdate(percentage, title, "Downloading: " + percentage + "% (ETA " + etaInSeconds + "s)");
                     }
                 };
                 YoutubeDLCallbackAdapter adapter = new YoutubeDLCallbackAdapter(execute_callback);
@@ -566,7 +570,7 @@ public class ForegroundDownloadService extends Service {
                 Log.e(ForegroundDownloadService.TAG, "Fetch error (attempt " + attempt + "): " + errorMessage);
                 callback.progressUpdate(0, "Unexpected Error on Fetch", "Fetch error (attempt " + attempt + "): " + errorMessage);
                 if (attempt == MAX_FETCH_RETRIES) {
-                    throw new RuntimeException("Video Info failed after retries: " + e.getMessage(), e);
+                    throw new RuntimeException("Video Info failed after retries: " + errorMessage, e);
                 }
 
                 // Retry with a random delay
@@ -634,12 +638,14 @@ public class ForegroundDownloadService extends Service {
                     // Extract the title and url
                     String title = entry.get("title").getAsString();
                     String video_url = entry.get("url").getAsString();
-                    String uploader = entry.get("uploader").getAsString();
+                    String uploader = entry.has("uploader") ? entry.get("uploader").getAsString() : null;
                     if (title == null || video_url == null || title.isEmpty() || video_url.isEmpty()) {
                         continue;
                     }
+                    title = FileUtils.sanitizeFilename(title);
+                    if(title.isEmpty()) continue;
 
-                    videoList.put(FileUtils.sanitizeFilename(title), new PlaylistVideoInfo(FileUtils.sanitizeFilename(title), video_url, uploader));
+                    videoList.put(title, new PlaylistVideoInfo(title, video_url, uploader));
                 }
 
                 // Return the video list
@@ -653,7 +659,7 @@ public class ForegroundDownloadService extends Service {
                 Log.e(ForegroundDownloadService.TAG, "Fetch error (attempt " + attempt + "): " + errorMessage);
                 callback.progressUpdate(0, "Unexpected Error on Fetch", "Fetch error (attempt " + attempt + "): " + errorMessage);
                 if (attempt == MAX_FETCH_RETRIES) {
-                    throw new RuntimeException("Playlist Info failed after retries: " + e.getMessage(), e);
+                    throw new RuntimeException("Playlist Info failed after retries: " + errorMessage, e);
                 }
 
                 // Retry with a random delay

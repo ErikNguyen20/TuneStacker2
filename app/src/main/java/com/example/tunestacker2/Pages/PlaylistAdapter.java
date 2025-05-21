@@ -1,6 +1,7 @@
 package com.example.tunestacker2.Pages;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -56,7 +57,7 @@ public class PlaylistAdapter extends RecyclerView.Adapter<PlaylistAdapter.Playli
         // Load the thumbnail asynchronously
         if (!songs.isEmpty()) {
             Song song = songs.get(0);
-            holder.songThumbnail.setImageBitmap(ThumbnailLoader.loadThumbnailSync(song, context.getApplicationContext()));
+            holder.songThumbnail.setImageBitmap(ThumbnailLoader.loadThumbnailNonNullSync(song, context.getApplicationContext()));
             ThumbnailLoader.loadLargeThumbnailAsync(song, context.getApplicationContext(), bitmap -> {
                 if (holder != null && holder.songThumbnail != null &&
                         holder.songThumbnail.getTag().equals(item.getTitle())) {
@@ -66,13 +67,16 @@ public class PlaylistAdapter extends RecyclerView.Adapter<PlaylistAdapter.Playli
         }
         else {
             // Sets to default if no songs
-            holder.songThumbnail.setImageBitmap(ThumbnailLoader.loadThumbnailSync(null, context.getApplicationContext()));
+            holder.songThumbnail.setImageResource(ThumbnailLoader.DEFAULT_THUMBNAIL);
         }
 
         // Regular click event
         holder.itemView.setOnClickListener(v -> {
+            int pos = holder.getAdapterPosition();
+            if (pos == RecyclerView.NO_POSITION) return;
+
             if (listener != null) {
-                listener.onPlaylistClicked(position);
+                listener.onPlaylistClicked(pos);
             }
         });
 

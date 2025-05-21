@@ -1,7 +1,8 @@
 package com.example.tunestacker2.Pages;
 
 import android.content.Context;
-import android.view.ContextThemeWrapper;
+import android.graphics.Bitmap;
+import android.graphics.Rect;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -9,10 +10,11 @@ import android.view.animation.OvershootInterpolator;
 import android.widget.CheckBox;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.PopupWindow;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.widget.PopupMenu;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.tunestacker2.MusicPlayer.Song;
@@ -29,6 +31,8 @@ public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.SongView
         void onSongDeleted(int pos);
         void onSongClicked(int pos);
         void onSongAddPlaylist(int pos);
+        void onSongCopy(int pos);
+        void onSongShare(int pos);
         void activateLongPress();
         void onToggleSelection(int pos);
     }
@@ -119,33 +123,44 @@ public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.SongView
 
 
         // Load the thumbnail asynchronously
-        holder.thumbnail.setImageBitmap(ThumbnailLoader.loadThumbnailSync(song, context.getApplicationContext()));
-        ThumbnailLoader.loadThumbnailAsync(song, context.getApplicationContext(), bitmap -> {
-            if (holder != null && holder.thumbnail != null &&
-                    holder.thumbnail.getTag().equals(song.getAudioUri().toString())) {
-                holder.thumbnail.setImageBitmap(bitmap);
-            }
-        });
+        Bitmap img = ThumbnailLoader.loadThumbnailSync(song);
+        if (img != null) {
+            holder.thumbnail.setImageBitmap(img);
+        } else {
+            holder.thumbnail.setImageResource(ThumbnailLoader.DEFAULT_THUMBNAIL);
+            ThumbnailLoader.loadThumbnailAsync(song, context.getApplicationContext(), bitmap -> {
+                if (holder != null && holder.thumbnail != null &&
+                        holder.thumbnail.getTag().equals(song.getAudioUri().toString())) {
+                    holder.thumbnail.setImageBitmap(bitmap);
+                }
+            });
+        }
 
         // Regular click event
         holder.itemView.setOnClickListener(v -> {
+            int pos = holder.getAdapterPosition();
+            if (pos == RecyclerView.NO_POSITION) return;
+
             if (isMultiSelectMode) {
-                toggleSelection(position);
+                toggleSelection(pos);
                 if (listener != null) {
-                    listener.onToggleSelection(position);
+                    listener.onToggleSelection(pos);
                 }
             } else {
                 if (listener != null) {
-                    listener.onSongClicked(position);
+                    listener.onSongClicked(pos);
                 }
             }
         });
 
         // Long-press to enter multi-select mode
         holder.itemView.setOnLongClickListener(v -> {
+            int pos = holder.getAdapterPosition();
+            if (pos == RecyclerView.NO_POSITION) return false;
+
             if (!isMultiSelectMode) {
                 setMultiSelectMode(true);
-                toggleSelection(position);
+                toggleSelection(pos);
                 if (listener != null) {
                     listener.activateLongPress();
                 }
@@ -156,32 +171,10 @@ public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.SongView
 
         // Options menu click event
         holder.optionsButton.setOnClickListener(v -> {
-            Context wrapper = new ContextThemeWrapper(context, R.style.AppTheme_PopupOverlay);
-            PopupMenu popup = new PopupMenu(wrapper, holder.optionsButton);
-            popup.inflate(R.menu.song_item_menu);
-            popup.setOnMenuItemClickListener(item -> {
-                int pos = holder.getAdapterPosition();
-                if (pos == RecyclerView.NO_POSITION) return true;
+            int pos = holder.getAdapterPosition();
+            if (pos == RecyclerView.NO_POSITION) return;
 
-                if (item.getItemId() == R.id.menu_play) {
-                    if (listener != null) {
-                        listener.onSongClicked(pos);
-                    }
-                    return true;
-                } else if (item.getItemId() == R.id.menu_delete) {
-                    if (listener != null) {
-                        listener.onSongDeleted(pos);
-                    }
-                    return true;
-                } else if(item.getItemId() == R.id.menu_add) {
-                    if (listener != null) {
-                        listener.onSongAddPlaylist(pos);
-                    }
-                    return true;
-                }
-                return false;
-            });
-            popup.show();
+            OpenOptionsDialog(holder.optionsButton, pos);
         });
 
         // Animation Effects
@@ -202,6 +195,66 @@ public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.SongView
     @Override
     public int getItemCount() {
         return songs.size();
+    }
+
+    /**
+     * Opens the options dialog for a song.
+     * @param anchor
+     * @param pos
+     */
+    private void OpenOptionsDialog(View anchor, int pos) {
+        if (context == null) return;
+
+        View popupView = LayoutInflater.from(context).inflate(R.layout.song_item_options_popup, null);
+        PopupWindow popupWindow = new PopupWindow(
+                popupView,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                true
+        );
+        popupWindow.setElevation(12f);
+        popupWindow.setOutsideTouchable(true);
+
+        // Handle each options button click
+        popupView.findViewById(R.id.option_play).setOnClickListener(v -> {
+            if(popupWindow.isShowing()) popupWindow.dismiss();
+            if (listener != null) listener.onSongClicked(pos);
+        });
+        popupView.findViewById(R.id.option_add).setOnClickListener(v -> {
+            if (popupWindow.isShowing()) popupWindow.dismiss();
+            if (listener != null) listener.onSongAddPlaylist(pos);
+        });
+        popupView.findViewById(R.id.option_copy).setOnClickListener(v -> {
+            if (popupWindow.isShowing()) popupWindow.dismiss();
+            if (listener != null) listener.onSongCopy(pos);
+        });
+        popupView.findViewById(R.id.option_share).setOnClickListener(v -> {
+            if (popupWindow.isShowing()) popupWindow.dismiss();
+            if (listener != null) listener.onSongShare(pos);
+        });
+        popupView.findViewById(R.id.option_delete).setOnClickListener(v -> {
+            if (popupWindow.isShowing()) popupWindow.dismiss();
+            if (listener != null) listener.onSongDeleted(pos);
+        });
+
+        // Ensures that the popup window is not cut off by the screen
+        popupView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        int popupHeight = popupView.getMeasuredHeight();
+        Rect screenRect = new Rect();
+        anchor.getWindowVisibleDisplayFrame(screenRect);
+        int screenHeight = screenRect.height();
+
+        // Get anchor position
+        int[] location = new int[2];
+        anchor.getLocationOnScreen(location);
+        int spaceBelow = screenHeight - (location[1] + anchor.getHeight());
+
+        // Show above or below based on available space
+        if (spaceBelow >= popupHeight) {
+            popupWindow.showAsDropDown(anchor, 0, 0);
+        } else {
+            popupWindow.showAsDropDown(anchor, 0, spaceBelow - popupHeight);
+        }
     }
 
     static class SongViewHolder extends RecyclerView.ViewHolder {

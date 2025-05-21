@@ -1,16 +1,14 @@
 package com.example.tunestacker2.Pages;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.OvershootInterpolator;
-import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.widget.PopupMenu;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.tunestacker2.MusicPlayer.Song;
@@ -68,17 +66,25 @@ public class MediaPlayerAdapter extends RecyclerView.Adapter<MediaPlayerAdapter.
         holder.thumbnail.setTag(song.getAudioUri().toString());
 
         // Set placeholder first (important for recycling!)
-        holder.thumbnail.setImageBitmap(ThumbnailLoader.loadThumbnailSync(song, context.getApplicationContext()));
-        ThumbnailLoader.loadThumbnailAsync(song, context.getApplicationContext(), bitmap -> {
-            if (holder != null && holder.thumbnail != null &&
-                    holder.thumbnail.getTag().equals(song.getAudioUri().toString())) {
-                holder.thumbnail.setImageBitmap(bitmap);
-            }
-        });
+        Bitmap img = ThumbnailLoader.loadThumbnailSync(song);
+        if (img != null) {
+            holder.thumbnail.setImageBitmap(img);
+        } else {
+            holder.thumbnail.setImageResource(ThumbnailLoader.DEFAULT_THUMBNAIL);
+            ThumbnailLoader.loadThumbnailAsync(song, context.getApplicationContext(), bitmap -> {
+                if (holder != null && holder.thumbnail != null &&
+                        holder.thumbnail.getTag().equals(song.getAudioUri().toString())) {
+                    holder.thumbnail.setImageBitmap(bitmap);
+                }
+            });
+        }
 
         holder.itemView.setOnClickListener(v -> {
+            int pos = holder.getAdapterPosition();
+            if (pos == RecyclerView.NO_POSITION) return;
+
             if (listener != null) {
-                listener.onSongClicked(position);
+                listener.onSongClicked(pos);
             }
         });
 

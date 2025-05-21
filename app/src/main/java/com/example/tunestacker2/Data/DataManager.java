@@ -113,13 +113,17 @@ public class DataManager {
     /**
      * Asynchronously loads playlists from the audio directory and returns via callback.
      *
+     * @param freshFetch If true, fetches playlists from the audio directory using IO.
      * @param callback Consumer to receive the playlist list on the main thread.
      */
-    public void getPlaylistsAsync(Consumer<List<Playlist>> callback) {
+    public void getPlaylistsAsync(boolean freshFetch, Consumer<List<Playlist>> callback) {
         if (Settings.GetAudioDirectory() == null) return;
 
         executor.execute(() -> {
-            playlists = FileUtils.batchedPlaylistsFromJsonFiles(context, Settings.GetAudioDirectory());
+            // Fetch playlists from IO
+            if (freshFetch) {
+                playlists = FileUtils.batchedPlaylistsFromJsonFiles(context, Settings.GetAudioDirectory());
+            }
 
             // Post result to UI thread
             if(callback != null) handler.post(() -> callback.accept(playlists));
@@ -380,7 +384,7 @@ public class DataManager {
      *
      * @param callback Callback with the list of songs.
      */
-    public void getSongsInDirectory(Consumer<List<Song>> callback) {
+    public void getSongsInDirectoryAsync(Consumer<List<Song>> callback) {
         executor.execute(() -> {
             List<Song> updatedSongs = FileUtils.listAudioFilesFromDirectory(context.getApplicationContext(), Settings.GetAudioDirectory());
             if(callback != null) handler.post(() -> callback.accept(updatedSongs));
@@ -418,6 +422,7 @@ public class DataManager {
             LoadEmbedThumbnail();
             LoadAutoUpdate();
             LoadSortOrder();
+            LoadEmbedMetadata();
         }
 
         // --- Settings Getters and Setters ---

@@ -3,7 +3,11 @@ package com.example.tunestacker2.Pages;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 
 import androidx.activity.OnBackPressedCallback;
@@ -19,6 +23,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -36,7 +41,6 @@ import android.widget.Toast;
 
 import com.example.tunestacker2.Data.DataManager;
 import com.example.tunestacker2.Data.FileUtils;
-import com.example.tunestacker2.Data.ForegroundDownloadService;
 import com.example.tunestacker2.MusicPlayer.Song;
 import com.example.tunestacker2.R;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -82,7 +86,7 @@ public class LibraryFragment extends Fragment {
          * Called when playlists have been modified (e.g., songs added) and the
          * playlist UI potentially needs refreshing.
          */
-        void requestPlaylistRefresh();
+        void requestPlaylistRefresh(boolean freshRefresh);
     }
 
     // --- Member Variables ---
@@ -175,6 +179,9 @@ public class LibraryFragment extends Fragment {
 
         // Load the initial list of songs
         refreshSongList();
+
+        // Preload playlists from JSON files AFTER loading initial songs
+        DataManager.getInstance().getPlaylistsAsync(true,null);
     }
 
     /**
@@ -260,21 +267,19 @@ public class LibraryFragment extends Fragment {
         return new LibraryAdapter.SongAdapterListener() {
             @Override
             public void onSongDeleted(int pos) {
-                if (filteredSongList.isEmpty() || pos < 0 || pos >= filteredSongList.size()) return;
+                if (filteredSongList.isEmpty() || pos < 0 || pos >= filteredSongList.size() || getContext() == null) return;
 
+                Context context = getContext();
                 Song song = filteredSongList.get(pos);
 
                 // Delete the audio
-                Context context = getContext();
-                if(context == null) return;
-
                 boolean result = FileUtils.deleteFileUri(context.getApplicationContext(), song.getAudioUri());
                 if(result) {
                     filteredSongList.remove(pos);
                     songAdapter.notifyItemRemoved(pos);
                     songAdapter.notifyItemRangeChanged(pos, filteredSongList.size());
                     Toast.makeText(context, "Deleted: " + song.getTitle(), Toast.LENGTH_SHORT).show();
-                    if(listener != null) listener.requestPlaylistRefresh();
+                    if(listener != null) listener.requestPlaylistRefresh(true);
                 }
                 else {
                     Toast.makeText(context, "Failed to delete: " + song.getTitle(), Toast.LENGTH_SHORT).show();
@@ -297,9 +302,52 @@ public class LibraryFragment extends Fragment {
             public void onSongAddPlaylist(int pos) {
                 if(filteredSongList.isEmpty() || pos < 0 || pos >= filteredSongList.size()) return;
 
+                Log.d("LibraryFragment", "onSongAddPlaylist called");
                 List<Song> selectedSongs = new ArrayList<>();
                 selectedSongs.add(filteredSongList.get(pos));
                 ShowPlaylistPickerDialog(selectedSongs);
+            }
+
+            @Override
+            public void onSongCopy(int pos) {
+                if (filteredSongList.isEmpty() || pos < 0 || pos >= filteredSongList.size() || getContext() == null) return;
+
+                Context context = getContext();
+                Song song = filteredSongList.get(pos);
+
+                ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+                ClipData clip = ClipData.newPlainText("Song Title", song.getTitle());
+                clipboard.setPrimaryClip(clip);
+
+                Toast.makeText(context, "Copied to clipboard.", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onSongShare(int pos) {
+                if (filteredSongList.isEmpty() || pos < 0 || pos >= filteredSongList.size() || getContext() == null) return;
+
+                Context context = getContext();
+                Song song = filteredSongList.get(pos);
+
+                Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                shareIntent.setType("audio/*");
+                shareIntent.putExtra(Intent.EXTRA_STREAM, song.getAudioUri());
+                shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                // Grant URI permission to all potential receivers
+                List<ResolveInfo> resInfoList;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    resInfoList = context.getPackageManager().queryIntentActivities(shareIntent, PackageManager.ResolveInfoFlags.of(0));
+                } else {
+                    resInfoList = context.getPackageManager().queryIntentActivities(shareIntent, 0);
+                }
+
+                for (ResolveInfo resolveInfo : resInfoList) {
+                    String packageName = resolveInfo.activityInfo.packageName;
+                    context.grantUriPermission(packageName, song.getAudioUri(), Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                }
+
+                context.startActivity(Intent.createChooser(shareIntent, "Share song via"));
             }
 
             @Override
@@ -542,7 +590,7 @@ public class LibraryFragment extends Fragment {
 
             // Add the songs to the playlists
             DataManager.getInstance().addSongsToPlaylistsAsync(selectedSongs, new ArrayList<>(selected), success -> {
-                if(listener != null) listener.requestPlaylistRefresh();
+                if(listener != null) listener.requestPlaylistRefresh(false);
                 if (!isAdded()) return;
 
                 if (success) {
@@ -592,7 +640,7 @@ public class LibraryFragment extends Fragment {
             refreshSongList();
             hideMultiSelectMenu();
             if(dialog.isShowing()) dialog.dismiss();
-            if(listener != null) listener.requestPlaylistRefresh();
+            if(listener != null) listener.requestPlaylistRefresh(true);
         });
 
         // Cancel button listener
@@ -609,22 +657,7 @@ public class LibraryFragment extends Fragment {
     private void OpenFilterDialog() {
         if (!isAdded() || getContext() == null) return;
 
-        // Inflate the popup menu layout
         View popupView = LayoutInflater.from(requireContext()).inflate(R.layout.sort_options_popup, null);
-        View dotAlpha = popupView.findViewById(R.id.dot_alpha);
-        View dotNewest = popupView.findViewById(R.id.dot_newest);
-        View dotOldest = popupView.findViewById(R.id.dot_oldest);
-
-        dotAlpha.setVisibility(View.GONE);
-        dotNewest.setVisibility(View.GONE);
-        dotOldest.setVisibility(View.GONE);
-        switch (selectedSortId) {
-            case 0: dotAlpha.setVisibility(View.VISIBLE); break;
-            case 1: dotNewest.setVisibility(View.VISIBLE); break;
-            case 2: dotOldest.setVisibility(View.VISIBLE); break;
-        }
-
-        // Create the PopupWindow
         PopupWindow popupWindow = new PopupWindow(
                 popupView,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -634,37 +667,37 @@ public class LibraryFragment extends Fragment {
         popupWindow.setElevation(12f);
         popupWindow.setOutsideTouchable(true);
 
-        // Listener for "Sort Alphabetically"
-        popupView.findViewById(R.id.sort_alpha).setOnClickListener(v -> {
-            if (selectedSortId != 0) {
-                selectedSortId = 0;
-                refreshSongList();
-                DataManager.Settings.SetSortOrder(0);
-            }
-            if(popupWindow.isShowing()) popupWindow.dismiss();
-        });
+        // Array of indicator dots and their matching sort IDs
+        final View[] dots = {
+                popupView.findViewById(R.id.dot_alpha),
+                popupView.findViewById(R.id.dot_newest),
+                popupView.findViewById(R.id.dot_oldest)
+        };
+        // Array of sort option buttons and their IDs
+        final int[] optionIds = {
+                R.id.sort_alpha,
+                R.id.sort_newest,
+                R.id.sort_oldest
+        };
 
-        // Listener for "Sort by Newest"
-        popupView.findViewById(R.id.sort_newest).setOnClickListener(v -> {
-            if (selectedSortId != 1) {
-                selectedSortId = 1;
-                refreshSongList();
-                DataManager.Settings.SetSortOrder(1);
-            }
-            if(popupWindow.isShowing()) popupWindow.dismiss();
-        });
+        // Hide all dots, then show the selected one
+        for (int i = 0; i < dots.length; i++) {
+            dots[i].setVisibility(i == selectedSortId ? View.VISIBLE : View.GONE);
+        }
 
-        // Listener for "Sort by Oldest"
-        popupView.findViewById(R.id.sort_oldest).setOnClickListener(v -> {
-            if (selectedSortId != 2) {
-                selectedSortId = 2;
-                refreshSongList();
-                DataManager.Settings.SetSortOrder(2);
-            }
-            if(popupWindow.isShowing()) popupWindow.dismiss();
-        });
+        // Set up click listeners in a loop
+        for (int i = 0; i < optionIds.length; i++) {
+            int sortId = i;
+            popupView.findViewById(optionIds[i]).setOnClickListener(v -> {
+                if (selectedSortId != sortId) {
+                    selectedSortId = sortId;
+                    refreshSongList();
+                    DataManager.Settings.SetSortOrder(sortId);
+                }
+                if (popupWindow.isShowing()) popupWindow.dismiss();
+            });
+        }
 
-        // Show it right below or beside the anchor button
         popupWindow.showAsDropDown(filterButton, 0, 0);
     }
 
@@ -825,7 +858,7 @@ public class LibraryFragment extends Fragment {
         }
 
         // Asynchronously fetch songs from the directory
-        DataManager.getInstance().getSongsInDirectory(updatedSongs -> {
+        DataManager.getInstance().getSongsInDirectoryAsync(updatedSongs -> {
             if (!isAdded()) return;
 
             fullSongList.clear();

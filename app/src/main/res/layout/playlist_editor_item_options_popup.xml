@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:background="@drawable/dialog_background"
+    android:padding="8dp"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:id="@+id/option_play"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:gravity="center_vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="10dp"
+            android:layout_weight="0"
+            app:srcCompat="@drawable/baseline_play_arrow_24" />
+
+        <TextView
+            android:text="Play"
+            android:textSize="15sp"
+            android:textColor="@color/white"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+
+
+    <LinearLayout
+        android:id="@+id/option_remove"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:gravity="center_vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="10dp"
+            app:srcCompat="@drawable/baseline_clear_24"
+            android:visibility="visible"
+            app:tint="@color/white" />
+
+        <TextView
+            android:text="Remove"
+            android:textSize="15sp"
+            android:textColor="@color/white"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+    <View
+        android:id="@+id/divider1"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginVertical="4dp"
+        android:background="@color/black" />
+
+    <!-- Copy -->
+    <LinearLayout
+        android:id="@+id/option_top"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:gravity="center_vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="10dp"
+            app:srcCompat="@drawable/vertical_align_top_24px"
+            app:tint="@color/white" />
+
+        <TextView
+            android:text="Move to top"
+            android:textSize="15sp"
+            android:textColor="@color/white"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <!-- Share -->
+    <LinearLayout
+        android:id="@+id/option_bottom"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:gravity="center_vertical"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="10dp"
+            app:srcCompat="@drawable/vertical_align_bottom_24px"
+            app:tint="@color/white" />
+
+        <TextView
+            android:text="Move to bottom"
+            android:textSize="15sp"
+            android:textColor="@color/white"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+</LinearLayout>

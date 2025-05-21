@@ -614,7 +614,7 @@ public class MediaPlayerFragment extends Fragment {
         Song song = songList.get(currentSongIndex);
         songTitle.setText(song.getTitle());
 
-        albumArt.setImageBitmap(ThumbnailLoader.loadThumbnailSync(song, requireContext().getApplicationContext()));
+        albumArt.setImageBitmap(ThumbnailLoader.loadThumbnailNonNullSync(song, requireContext().getApplicationContext()));
 
         // Loads higher resolution image
         ThumbnailLoader.loadLargeThumbnailAsync(song, requireContext().getApplicationContext(), bitmap -> {

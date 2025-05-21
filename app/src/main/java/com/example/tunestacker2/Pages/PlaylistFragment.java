@@ -122,10 +122,10 @@ public class PlaylistFragment extends Fragment {
         setupPlaylistNameInputValidation();
 
         // Setup the swipe-to-refresh layout
-        swipeRefreshLayout.setOnRefreshListener(this::refreshPlaylistList);
+        swipeRefreshLayout.setOnRefreshListener(() -> refreshPlaylistList(true));
 
         // Perform an initial refresh of the playlist list
-        refreshPlaylistList();
+        refreshPlaylistList(false);
     }
 
     /**
@@ -255,7 +255,7 @@ public class PlaylistFragment extends Fragment {
                 }
 
                 // Playlist created successfully:
-                refreshPlaylistList();
+                refreshPlaylistList(false);
                 editPlaylistName.setText("");
                 hideKeyboard(editPlaylistName);
                 Toast.makeText(context, "Playlist added", Toast.LENGTH_SHORT).show();
@@ -285,7 +285,7 @@ public class PlaylistFragment extends Fragment {
      * Fetches the latest playlists from the DataManager asynchronously and updates the adapter.
      * Shows/hides the swipe refresh indicator.
      */
-    public void refreshPlaylistList() {
+    public void refreshPlaylistList(boolean freshFetch) {
         if (swipeRefreshLayout != null && !swipeRefreshLayout.isRefreshing()) {
             swipeRefreshLayout.setRefreshing(true);
         }
@@ -297,8 +297,11 @@ public class PlaylistFragment extends Fragment {
         }
 
         // Fetch the playlists asynchronously using DataManager
-        DataManager.getInstance().getPlaylistsAsync(playlists -> {
-            if (!isAdded() || playlistAdapter == null) return;
+        DataManager.getInstance().getPlaylistsAsync(freshFetch, playlists -> {
+            if (!isAdded() || playlistAdapter == null)  {
+                if(swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
+                return;
+            }
 
             playlistList.clear();
             playlistList.addAll(playlists);

@@ -1,7 +1,9 @@
 package com.example.tunestacker2.Pages;
 
 import android.content.Context;
-import android.view.ContextThemeWrapper;
+import android.graphics.Bitmap;
+import android.graphics.Rect;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -9,19 +11,18 @@ import android.view.animation.OvershootInterpolator;
 import android.widget.CheckBox;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.PopupWindow;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.widget.PopupMenu;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.tunestacker2.MusicPlayer.Song;
 import com.example.tunestacker2.MusicPlayer.ThumbnailLoader;
 import com.example.tunestacker2.R;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 public class PlaylistEditorAdapter extends RecyclerView.Adapter<PlaylistEditorAdapter.SongViewHolder> {
 
@@ -63,54 +64,36 @@ public class PlaylistEditorAdapter extends RecyclerView.Adapter<PlaylistEditorAd
         // Tag the view to track recycling
         holder.thumbnail.setTag(song.getAudioUri().toString());
 
-
         // Load the thumbnail asynchronously
-        holder.thumbnail.setImageBitmap(ThumbnailLoader.loadThumbnailSync(song, context.getApplicationContext()));
-        ThumbnailLoader.loadLargeThumbnailAsync(song, context.getApplicationContext(), bitmap -> {
-            if (holder != null && holder.thumbnail != null &&
-                    holder.thumbnail.getTag().equals(song.getAudioUri().toString())) {
-                holder.thumbnail.setImageBitmap(bitmap);
-            }
-        });
+        Bitmap img = ThumbnailLoader.loadThumbnailSync(song);
+        if (img != null) {
+            holder.thumbnail.setImageBitmap(img);
+        } else {
+            holder.thumbnail.setImageResource(ThumbnailLoader.DEFAULT_THUMBNAIL);
+            ThumbnailLoader.loadLargeThumbnailAsync(song, context.getApplicationContext(), bitmap -> {
+                if (holder != null && holder.thumbnail != null &&
+                        holder.thumbnail.getTag().equals(song.getAudioUri().toString())) {
+                    holder.thumbnail.setImageBitmap(bitmap);
+                }
+            });
+        }
 
         // Regular click event
         holder.itemView.setOnClickListener(v -> {
+            int pos = holder.getAdapterPosition();
+            if (pos == RecyclerView.NO_POSITION) return;
+
             if (listener != null) {
-                listener.onSongClicked(position);
+                listener.onSongClicked(pos);
             }
         });
 
         // Options menu click event
         holder.optionsButton.setOnClickListener(v -> {
-            Context wrapper = new ContextThemeWrapper(context, R.style.AppTheme_PopupOverlay);
-            PopupMenu popup = new PopupMenu(wrapper, holder.optionsButton);
-            popup.inflate(R.menu.playlist_editor_song_item_menu);
-            popup.setOnMenuItemClickListener(item -> {
-                int pos = holder.getAdapterPosition();
-                if (pos == RecyclerView.NO_POSITION) return true;
+            int pos = holder.getAdapterPosition();
+            if (pos == RecyclerView.NO_POSITION) return;
 
-                if (item.getItemId() == R.id.menu_play) {
-                    if (listener != null) {
-                        listener.onSongClicked(pos);
-                    }
-                    return true;
-                } else if (item.getItemId() == R.id.menu_delete) {
-                    if (listener != null) {
-                        listener.onSongDeleted(pos);
-                    }
-                    return true;
-                } else if(item.getItemId() == R.id.menu_moveup) {
-                    if (listener != null) {
-                        listener.onSongMoveUp(pos);
-                    }
-                } else if(item.getItemId() == R.id.menu_movedown) {
-                    if (listener != null) {
-                        listener.onSongMoveDown(pos);
-                    }
-                }
-                return false;
-            });
-            popup.show();
+            OpenOptionsDialog(holder.optionsButton, pos);
         });
 
         // Animation Effects
@@ -131,6 +114,62 @@ public class PlaylistEditorAdapter extends RecyclerView.Adapter<PlaylistEditorAd
     @Override
     public int getItemCount() {
         return songs.size();
+    }
+
+    /**
+     * Opens the options dialog for a song.
+     * @param anchor
+     * @param pos
+     */
+    private void OpenOptionsDialog(View anchor, int pos) {
+        if (context == null) return;
+
+        View popupView = LayoutInflater.from(context).inflate(R.layout.playlist_editor_item_options_popup, null);
+        PopupWindow popupWindow = new PopupWindow(
+                popupView,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                true
+        );
+        popupWindow.setElevation(12f);
+        popupWindow.setOutsideTouchable(true);
+
+        // Handle each options button click
+        popupView.findViewById(R.id.option_play).setOnClickListener(v -> {
+            if(popupWindow.isShowing()) popupWindow.dismiss();
+            if (listener != null) listener.onSongClicked(pos);
+        });
+        popupView.findViewById(R.id.option_remove).setOnClickListener(v -> {
+            if (popupWindow.isShowing()) popupWindow.dismiss();
+            if (listener != null) listener.onSongDeleted(pos);
+        });
+        popupView.findViewById(R.id.option_top).setOnClickListener(v -> {
+            if (popupWindow.isShowing()) popupWindow.dismiss();
+            if (listener != null) listener.onSongMoveUp(pos);
+        });
+        popupView.findViewById(R.id.option_bottom).setOnClickListener(v -> {
+            if (popupWindow.isShowing()) popupWindow.dismiss();
+            if (listener != null) listener.onSongMoveDown(pos);
+        });
+
+        // Ensures that the popup window is not cut off by the screen
+        popupView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        int popupHeight = popupView.getMeasuredHeight();
+        Rect screenRect = new Rect();
+        anchor.getWindowVisibleDisplayFrame(screenRect);
+        int screenHeight = screenRect.height();
+
+        // Get anchor position
+        int[] location = new int[2];
+        anchor.getLocationOnScreen(location);
+        int spaceBelow = screenHeight - (location[1] + anchor.getHeight());
+
+        // Show above or below based on available space
+        if (spaceBelow >= popupHeight) {
+            popupWindow.showAsDropDown(anchor, 0, 0);
+        } else {
+            popupWindow.showAsDropDown(anchor, 0, spaceBelow - popupHeight);
+        }
     }
 
     static class SongViewHolder extends RecyclerView.ViewHolder {

@@ -14,7 +14,6 @@ import androidx.collection.LruCache;
 import com.example.tunestacker2.R;
 
 import java.io.IOException;
-import java.lang.ref.WeakReference;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -122,7 +121,8 @@ public class ThumbnailLoader {
      * @param context The application context.
      * @return A thumbnail bitmap, either from cache or default.
      */
-    public static Bitmap loadThumbnailSync(Song song, Context context) {
+    @Deprecated
+    public static Bitmap loadThumbnailNonNullSync(Song song, Context context) {
         if(song == null || song.getAudioUri() == null) {
             return getDefaultThumbnail(context);
         }
@@ -136,6 +136,23 @@ public class ThumbnailLoader {
         }
 
         return getDefaultThumbnail(context);
+    }
+
+    /**
+     * Loads a 64x64 thumbnail for a song synchronously from cache or returns the default.
+     *
+     * @param song    The song whose thumbnail is to be retrieved.
+     * @return A thumbnail bitmap, either from cache or default.
+     */
+    public static Bitmap loadThumbnailSync(Song song) {
+        if(song == null || song.getAudioUri() == null) {
+            return null;
+        }
+
+        Uri audioUri = song.getAudioUri();
+        synchronized (cache64x64) {
+            return cache64x64.get(audioUri.toString());
+        }
     }
 
     /**

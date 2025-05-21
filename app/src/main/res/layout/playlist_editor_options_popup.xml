@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:background="@drawable/dialog_background"
+    android:padding="8dp"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:id="@+id/option_rename"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:gravity="center_vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="10dp"
+            android:layout_weight="0"
+            app:srcCompat="@drawable/baseline_edit_24" />
+
+        <TextView
+            android:text="Rename"
+            android:textSize="15sp"
+            android:textColor="@color/white"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+    <View
+        android:id="@+id/divider1"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginVertical="4dp"
+        android:background="@color/black" />
+
+    <LinearLayout
+        android:id="@+id/option_delete"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:gravity="center_vertical"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="10dp"
+            android:layout_weight="0"
+            app:srcCompat="@drawable/baseline_delete_24"
+            app:tint="@color/red"
+            />
+
+        <TextView
+            android:text="Delete Playlist"
+            android:textSize="15sp"
+            android:textColor="@color/red"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+</LinearLayout>

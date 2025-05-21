@@ -23,6 +23,8 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.PopupWindow;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -73,7 +75,7 @@ public class PlaylistEditorFragment extends Fragment {
          * Called when the playlist data might have changed (e.g., renamed, deleted)
          * and the hosting view (like the main playlist list) should refresh itself.
          */
-        void requestPlaylistRefresh();
+        void requestPlaylistRefresh(boolean freshFetch);
     }
 
     // --- Constants ---
@@ -109,6 +111,7 @@ public class PlaylistEditorFragment extends Fragment {
     // --- State ---
     private boolean isClosing = false;
     private boolean isInvalidState = false;
+    private boolean changesMadeToPlaylist = false;
 
 
     /**
@@ -302,8 +305,10 @@ public class PlaylistEditorFragment extends Fragment {
                         songList.remove(pos);
                         adapter.notifyItemRemoved(pos);
                     }
+
                     refreshPlaylistView();
-                    if(listener != null) listener.requestPlaylistRefresh();
+                    // if(listener != null) listener.requestPlaylistRefresh();
+                    changesMadeToPlaylist = true;
                 });
             }
 
@@ -328,6 +333,7 @@ public class PlaylistEditorFragment extends Fragment {
                 // Persist the changed order after the drag operation is complete
                 DataManager.getInstance().updateSongsInPlaylistAsync(playlist.getTitle(), songList, success -> {
                     if(!isAdded()) return;
+                    changesMadeToPlaylist = true;
                     refreshPlaylistView();
                 });
             }
@@ -344,7 +350,12 @@ public class PlaylistEditorFragment extends Fragment {
                 // Persist the changed order after the drag operation is complete
                 DataManager.getInstance().updateSongsInPlaylistAsync(playlist.getTitle(), songList, success -> {
                     if(!isAdded()) return;
-                    refreshPlaylistView();
+
+                    if(pos == 0) {
+                        // Micro-optimization to only refresh when it would actually change the display
+                        changesMadeToPlaylist = true;
+                        refreshPlaylistView();
+                    }
                 });
             }
         });
@@ -407,6 +418,8 @@ public class PlaylistEditorFragment extends Fragment {
 
                 // Swap the items in the local list
                 if (fromPos < 0 || toPos < 0 || fromPos >= songList.size() || toPos >= songList.size()) return false;
+
+                // Update the list
                 Collections.swap(songList, fromPos, toPos);
                 adapter.notifyItemMoved(fromPos, toPos);
 
@@ -425,6 +438,7 @@ public class PlaylistEditorFragment extends Fragment {
                 // Persist the changed order after the drag operation is complete
                 DataManager.getInstance().updateSongsInPlaylistAsync(playlist.getTitle(), songList, success -> {
                     if(!isAdded()) return;
+                    changesMadeToPlaylist = true;
                     refreshPlaylistView();
                 });
             }
@@ -467,22 +481,29 @@ public class PlaylistEditorFragment extends Fragment {
 
         // Options menu click event
         btnOptions.setOnClickListener(v -> {
-            Context wrapper = new ContextThemeWrapper(requireContext(), R.style.AppTheme_PopupOverlay);
-            PopupMenu popup = new PopupMenu(wrapper, btnOptions);
-            popup.inflate(R.menu.playlist_editor_options_menu);
-            popup.setOnMenuItemClickListener(item -> {
-                if (item.getItemId() == R.id.menu_rename) {
-                    // Do a popup and let user put in a new title
-                    OpenRenameDialog();
-                    return true;
-                } else if (item.getItemId() == R.id.menu_delete) {
-                    // Do a popup and let user confirm deletion
-                    OpenDeleteConfirmation();
-                    return true;
-                }
-                return false;
+            if (getContext() == null) return;
+
+            View popupView = LayoutInflater.from(requireContext()).inflate(R.layout.playlist_editor_options_popup, null);
+            PopupWindow popupWindow = new PopupWindow(
+                    popupView,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    true
+            );
+            popupWindow.setElevation(12f);
+            popupWindow.setOutsideTouchable(true);
+
+            // Handle each options button click
+            popupView.findViewById(R.id.option_rename).setOnClickListener(v2 -> {
+                if(popupWindow.isShowing()) popupWindow.dismiss();
+                OpenRenameDialog();
             });
-            popup.show();
+            popupView.findViewById(R.id.option_delete).setOnClickListener(v2 -> {
+                if (popupWindow.isShowing()) popupWindow.dismiss();
+                OpenDeleteConfirmation();
+            });
+
+            popupWindow.showAsDropDown(btnOptions, 0, 0);
         });
 
         // Floating Action Button to scroll to the top of the playlistRecyclerView
@@ -590,7 +611,8 @@ public class PlaylistEditorFragment extends Fragment {
                     Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show();
                 } else {
                     // Rename successful
-                    if(listener != null) listener.requestPlaylistRefresh();
+                    // if(listener != null) listener.requestPlaylistRefresh();
+                    changesMadeToPlaylist = true;
                     playlist.setTitle(finalNewName);
                     refreshPlaylistView();
                 }
@@ -636,7 +658,8 @@ public class PlaylistEditorFragment extends Fragment {
 
                 if(success) {
                     // Deletion successful
-                    if(listener != null) listener.requestPlaylistRefresh();
+                    // if(listener != null) listener.requestPlaylistRefresh();
+                    changesMadeToPlaylist = true;
                     closeWithAnimation();
                 } else {
                     // Deletion failed
@@ -668,11 +691,12 @@ public class PlaylistEditorFragment extends Fragment {
 
         // Ensures that the thumbnail is not null before attempting to load
         if(songList.isEmpty()) {
+            playlistThumbnail.setImageResource(ThumbnailLoader.DEFAULT_THUMBNAIL);
             return;
         }
 
         // Update the playlist thumbnail based on the first song
-        playlistThumbnail.setImageBitmap(ThumbnailLoader.loadThumbnailSync(songList.get(0), requireContext().getApplicationContext()));
+        playlistThumbnail.setImageBitmap(ThumbnailLoader.loadThumbnailNonNullSync(songList.get(0), requireContext().getApplicationContext()));
         ThumbnailLoader.loadLargeThumbnailAsync(songList.get(0), requireContext().getApplicationContext(), bitmap -> {
             if (isAdded() && playlistThumbnail != null) {
                 playlistThumbnail.setImageBitmap(bitmap);
@@ -711,6 +735,9 @@ public class PlaylistEditorFragment extends Fragment {
     private void closeWithAnimation() {
         if(isClosing) return;
         isClosing = true; // Prevent re-entry
+
+        // Refresh playlist view when going back
+        if(listener != null && changesMadeToPlaylist) listener.requestPlaylistRefresh(false);
 
         // Fallback if editorContainer is null
         if (editorContainer == null && isAdded()) {

@@ -831,7 +831,7 @@ public class MediaPlayerService extends Service {
         // Basic notification properties
         builder.setContentTitle(currentSong.getTitle())
                 .setSmallIcon(android.R.drawable.ic_media_play)
-                .setLargeIcon(ThumbnailLoader.loadThumbnailSync(currentSong, getApplicationContext()))
+                .setLargeIcon(ThumbnailLoader.loadThumbnailNonNullSync(currentSong, getApplicationContext()))
                 .setDeleteIntent(stopIntent)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // Show on lock screen
                 .setOngoing(isPlaying);

@@ -366,8 +366,8 @@ public class MainActivity extends AppCompatActivity implements LibraryFragment.L
      * the PlaylistFragment page.
      */
     @Override
-    public void requestPlaylistRefresh() {
-        updatePlaylistFragmentRecyclerView();
+    public void requestPlaylistRefresh(boolean freshRefresh) {
+        updatePlaylistFragmentRecyclerView(freshRefresh);
     }
 
     /**
@@ -377,7 +377,7 @@ public class MainActivity extends AppCompatActivity implements LibraryFragment.L
     @Override
     public void onDirectorySwitch() {
         updateLibraryFragmentRecyclerView();
-        updatePlaylistFragmentRecyclerView();
+        updatePlaylistFragmentRecyclerView(true);
     }
 
     // --- Download Progress Popup Methods ---
@@ -473,13 +473,13 @@ public class MainActivity extends AppCompatActivity implements LibraryFragment.L
      * Finds the currently displayed {@link PlaylistFragment} and calls its method
      * to refresh the list of songs, typically after a download completes.
      */
-    private void updatePlaylistFragmentRecyclerView() {
+    private void updatePlaylistFragmentRecyclerView(boolean freshRefresh) {
         // f1 is the tag for the PlaylistFragment automatically created by the base class of adapter
         FragmentManager fm = getSupportFragmentManager();
         Fragment fragment = fm.findFragmentByTag("f1");
 
         if (fragment != null && fragment.isAdded() && fragment instanceof PlaylistFragment) {
-            ((PlaylistFragment) fragment).refreshPlaylistList();
+            ((PlaylistFragment) fragment).refreshPlaylistList(freshRefresh);
         }
     }
 
