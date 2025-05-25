@@ -253,7 +253,8 @@ public class LibraryAdapter extends RecyclerView.Adapter<LibraryAdapter.SongView
         if (spaceBelow >= popupHeight) {
             popupWindow.showAsDropDown(anchor, 0, 0);
         } else {
-            popupWindow.showAsDropDown(anchor, 0, spaceBelow - popupHeight);
+            int yOffset = -(popupHeight + anchor.getHeight());
+            popupWindow.showAsDropDown(anchor, 0, yOffset);
         }
     }
 

@@ -342,8 +342,12 @@ public class MediaPlayerService extends Service {
                 case AudioManager.AUDIOFOCUS_GAIN:
                     // Regained focus: Resume playback if needed, restore volume
                     Log.d(TAG, "Audio Focus: AUDIOFOCUS_GAIN");
-                    if (resumeOnFocusGain && mediaPlayer != null && !mediaPlayer.isPlaying()) {
-                        safePlay();
+                    if (resumeOnFocusGain) {
+                        if (!isPrepared && currentlyPlayingPosition != -1) {
+                            prepareAndPlayTrack(currentlyPlayingPosition);
+                        } else if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
+                            play();
+                        }
                         resumeOnFocusGain = false;
                     }
                     // Restore full volume
@@ -685,6 +689,7 @@ public class MediaPlayerService extends Service {
         } else {
             mediaPlayer.reset();
         }
+        mediaPlayer.setVolume(1.0f, 1.0f);
         isPrepared = false;
 
         Song currentSong = songList.get(currentlyPlayingPosition);

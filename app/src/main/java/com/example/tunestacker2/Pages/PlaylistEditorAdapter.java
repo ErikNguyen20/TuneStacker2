@@ -168,7 +168,8 @@ public class PlaylistEditorAdapter extends RecyclerView.Adapter<PlaylistEditorAd
         if (spaceBelow >= popupHeight) {
             popupWindow.showAsDropDown(anchor, 0, 0);
         } else {
-            popupWindow.showAsDropDown(anchor, 0, spaceBelow - popupHeight);
+            int yOffset = -(popupHeight + anchor.getHeight());
+            popupWindow.showAsDropDown(anchor, 0, yOffset);
         }
     }
 

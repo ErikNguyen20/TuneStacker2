@@ -139,10 +139,10 @@ public class ThumbnailLoader {
     }
 
     /**
-     * Loads a 64x64 thumbnail for a song synchronously from cache or returns the default.
+     * Loads a 64x64 thumbnail for a song synchronously from cache or returns null.
      *
      * @param song    The song whose thumbnail is to be retrieved.
-     * @return A thumbnail bitmap, either from cache or default.
+     * @return A thumbnail bitmap, either from cache or null.
      */
     public static Bitmap loadThumbnailSync(Song song) {
         if(song == null || song.getAudioUri() == null) {
