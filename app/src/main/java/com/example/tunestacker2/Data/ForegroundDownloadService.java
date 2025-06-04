@@ -483,7 +483,7 @@ public class ForegroundDownloadService extends Service {
                     @Override
                     public void onProgressUpdate(float progress, long etaInSeconds, String line) {
                         if(etaInSeconds == -1) {
-                            callback.progressUpdate(0, title, "Preparing Downloader...");
+                            callback.progressUpdate(0, title, "Preparing Download...");
                             return;
                         }
 

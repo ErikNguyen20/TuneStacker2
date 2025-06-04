@@ -177,6 +177,10 @@ public class PlaylistFragment extends Fragment {
                     Playlist playlist = playlistList.get(pos);
                     if (listener != null) listener.onLaunchPlaylistEditor(playlist);
 
+                    if(editPlaylistName.isFocused()) {
+                        hideKeyboard(editPlaylistName);
+                    }
+
                     // Update last played time for the playlist
                     // (If its the first one, don't bother updating)
                     if(pos == 0) return;
@@ -257,7 +261,9 @@ public class PlaylistFragment extends Fragment {
                 // Playlist created successfully:
                 refreshPlaylistList(false);
                 editPlaylistName.setText("");
-                hideKeyboard(editPlaylistName);
+                if(editPlaylistName.isFocused()) {
+                    hideKeyboard(editPlaylistName);
+                }
                 Toast.makeText(context, "Playlist added", Toast.LENGTH_SHORT).show();
             });
         }

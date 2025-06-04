@@ -28,7 +28,8 @@ public class ThumbnailLoader {
 
     // --- Cache and Background Operations ---
     private static final LruCache<String, Bitmap> cache64x64 = new LruCache<>(256); // cache ~256 images
-    private static final ExecutorService executor = Executors.newFixedThreadPool(2); // adjust thread count as needed
+    private static final int CORES = Runtime.getRuntime().availableProcessors();
+    private static final ExecutorService executor = Executors.newFixedThreadPool(Math.min(4, CORES)); // adjust thread count as needed
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private static volatile Bitmap defaultThumbnail = null;

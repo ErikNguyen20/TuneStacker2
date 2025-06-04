@@ -181,7 +181,11 @@ public class LibraryFragment extends Fragment {
         refreshSongList();
 
         // Preload playlists from JSON files AFTER loading initial songs
-        DataManager.getInstance().getPlaylistsAsync(true,null);
+        DataManager.getInstance().getPlaylistsAsync(true,playlists -> {
+            if (!isAdded()) return;
+
+            if(listener != null) listener.requestPlaylistRefresh(false);
+        });
     }
 
     /**
@@ -295,6 +299,9 @@ public class LibraryFragment extends Fragment {
 
                 if (listener != null) {
                     listener.onLaunchMediaPlayer(filteredSongList, pos, 1);
+                }
+                if (searchBar.isFocused()) {
+                    hideKeyboard(searchBar);
                 }
             }
 
@@ -501,6 +508,9 @@ public class LibraryFragment extends Fragment {
             if (listener != null) {
                 List<Song> songList = new ArrayList<>(selected);
                 listener.onLaunchMediaPlayer(songList, 0, 2);
+            }
+            if (searchBar.isFocused()) {
+                hideKeyboard(searchBar);
             }
             hideMultiSelectMenu();
         });
